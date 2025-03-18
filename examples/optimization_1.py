@@ -110,8 +110,8 @@ A, b
 G = np.zeros((2, N))
 G[0, 0:5] = 1
 G[1, 6:10] = 1
-# h = np.array([1, 1])
-h = np.array([0.5, 0.5])
+h = np.array([1, 1])
+# h = np.array([0.5, 0.5])
 
 G, h
 
@@ -220,6 +220,7 @@ weights_minv.plot(kind='bar')
 
 # Define a grid of risk aversion parameters
 risk_aversion_grid = np.linspace(0, 20, 100)
+risk_aversion_grid
 
 # Prepare an empty dict to store the weights for each risk aversion parameter
 weights_dict = {}
@@ -256,7 +257,7 @@ weights_df = pd.DataFrame(weights_dict).T
 weights_df.index.name = 'risk_aversion'
 
 weights_df
-weights_df.T.plot(legend=False, kind='bar', cmap='viridis')
+# weights_df.T.plot(legend=False, kind='bar', cmap='viridis')
 
 
 
@@ -266,6 +267,8 @@ portf_vola = np.diag(weights_df @ covmat @ weights_df.T)
 portf_return = weights_df @ mu
 
 plt.scatter(portf_vola, portf_return, c=portf_return / portf_vola, cmap='viridis')
+
+
 
 
 

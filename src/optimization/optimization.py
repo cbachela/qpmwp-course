@@ -12,7 +12,7 @@
 
 # Standard library imports
 from abc import ABC, abstractmethod
-from typing import Optional, Union
+from typing import Optional
 
 # Third party imports
 import numpy as np
@@ -179,6 +179,23 @@ class Optimization(ABC):
 
         return None
 
+
+
+class EmptyOptimization(Optimization):
+    '''
+    Placeholder class for an optimization.
+    This class is intended to be a placeholder and should not be used directly.
+    '''
+
+    def set_objective(self, optimization_data: OptimizationData) -> None:
+        raise NotImplementedError(
+            'EmptyOptimization is a placeholder and does not implement set_objective.'
+        )
+
+    def solve(self) -> None:
+        raise NotImplementedError(
+            'EmptyOptimization is a placeholder and does not implement solve.'
+        )
 
 
 
