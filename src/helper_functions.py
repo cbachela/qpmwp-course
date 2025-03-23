@@ -32,16 +32,16 @@ def load_data_msci(path: Optional[str] = None, n: int = 24) -> dict[str, pd.Data
 
     # Load msci country index return series
     df = pd.read_csv(os.path.join(path, 'msci_country_indices.csv'),
-                        index_col=0,
+                        index_col=0, # Specifies that the first column ("dates") is used as index and is no longer in the dataframe.
                         header=0,
                         parse_dates=True,
                         date_format='%d-%m-%Y')
-    series_id = df.columns[0:n]
+    series_id = df.columns[0:n] # Because the first column ('dates') is used as the index and no longer part of the dataframe, we start selecting the remaining columns from position zero.
     X = df[series_id]
 
     # Load msci world index return series
     y = pd.read_csv(f'{path}NDDLWI.csv',
-                    index_col=0,
+                    index_col=0, # Specifies that the first column ("dates") is used as index and is no longer in the dataframe.
                     header=0,
                     parse_dates=True,
                     date_format='%d-%m-%Y')

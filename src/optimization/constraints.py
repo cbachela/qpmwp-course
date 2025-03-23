@@ -53,6 +53,7 @@ class Constraints:
                        'sense': sense,
                        'rhs': rhs}
         return None
+    # Written like this the b-vector ("rhs") is just a scalar and the A-matrix ("Amat") is just a matrix with one row of ones and and n columns. So there is just one equality constraint (budget constraint).
 
     def add_box(self,
                 box_type="LongOnly",

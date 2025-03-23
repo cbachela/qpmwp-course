@@ -24,8 +24,8 @@ import pandas as pd
 # - Add a docstrings
 
 # [ ] Add mean estimator functions:
-#       [ ] mean_harmonic
-#       [ ] mean_ewma (exponential weighted)
+# [ ] mean_harmonic
+# [ ] mean_ewma (exponential weighted)
 
 
 
@@ -99,7 +99,7 @@ class ExpectedReturn:
             raise ValueError(
                 'Estimation method not recognized.'
             )
-        if inplace:
+        if inplace: # If "inplace" is set to True (the default), then "self.vector" is automatically updated with "mu". If "inplace" is set to False, the method returns "mu" but does not update "self.vector" — you have to assign it manually.
             self.vector = mu
             return None
         else:
