@@ -137,6 +137,8 @@ qp.problem_data
 qp.is_feasible() #check whether we could find a solution
 
 qp.solve()
+qp.results.get('solution')
+
 qp.objective_value()
 
 solution = qp.results.get('solution')
