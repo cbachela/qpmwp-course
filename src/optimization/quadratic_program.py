@@ -32,7 +32,7 @@ IGNORED_SOLVERS = {
     'piqp',
     'proxqp',
     'clarabel'
-}
+} #those solvers could create some issues so we just ignore them and remove them from the usable solvers
 USABLE_SOLVERS = ALL_SOLVERS - IGNORED_SOLVERS
 
 

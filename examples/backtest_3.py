@@ -133,6 +133,8 @@ selection_item_builders = {
         k = 10,
     ),
 }
+#random - Backtest item builder function for defining the selection 
+#         based on a random k-out-of-n sampling of all available return series.
 
 
 

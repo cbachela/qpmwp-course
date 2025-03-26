@@ -52,7 +52,8 @@ import pandas as pd
 class CovarianceSpecification(dict):
 
     def __init__(self,
-                 method='pearson',
+                 method='pearson', 
+                #now only one method - pearson
                 #  check_positive_definite=False,
                  **kwargs):
         super().__init__(

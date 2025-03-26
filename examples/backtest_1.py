@@ -133,7 +133,7 @@ optimization = MeanVariance(
 # --------------------------------------------------------------------------
 
 # Define rebalancing dates
-n_days = 21 * 3
+n_days = 21 * 3 #3 month rebancing dates
 start_date = '2010-01-01'
 dates = data['return_series'].index
 rebdates = dates[dates > start_date][::n_days].strftime('%Y-%m-%d').tolist()
@@ -156,7 +156,7 @@ rebdates
 optimization_item_builders = {
     'return_series': OptimizationItemBuilder(
         bibfn = bibfn_return_series,
-        width = 365 * 3,
+        width = 256 * 3,
     ),
 }
 

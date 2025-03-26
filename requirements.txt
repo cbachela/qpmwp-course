@@ -36,14 +36,14 @@ pillow==11.0.0
 piqp==0.4.2
 platformdirs==4.3.6
 prompt_toolkit==3.0.48
-proxsuite==0.6.7
+#proxsuite==0.6.7
 psutil==6.1.1
 pure_eval==0.2.3
 Pygments==2.18.0
 pyparsing==3.2.0
 python-dateutil==2.9.0.post0
 pytz==2024.2
-pywin32==308
+#pywin32==308
 pyzmq==26.2.0
 qdldl==0.1.7.post4
 qpalm==1.2.5

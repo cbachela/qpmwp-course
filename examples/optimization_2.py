@@ -50,7 +50,7 @@ from optimization.optimization import MeanVariance
 # --------------------------------------------------------------------------
 
 N = 10
-data = load_data_msci(path = '../data/', n = N)
+data = load_data_msci(path = '../data/', n = N) #discrete returns for the first 10 countries
 data
 
 
@@ -65,7 +65,7 @@ X = data['return_series']
 scalefactor = 1  # could be set to 252 (trading days) for annualized returns
 
 
-expected_return = ExpectedReturn(method='geometric', scalefactor=scalefactor)
+expected_return = ExpectedReturn(method='geometric', scalefactor=scalefactor) #estimate expected returns using geometric mean
 expected_return.estimate(X=X, inplace=True)
 # Or:
 mu = expected_return.estimate(X=X, inplace=False)
@@ -84,13 +84,13 @@ Sigma = covariance.estimate(X=X, inplace=False)
 # --------------------------------------------------------------------------
 
 # Instantiate the class
-constraints = Constraints(ids = X.columns.tolist())
+constraints = Constraints(ids = X.columns.tolist()) 
 
 # Add budget constraint
 constraints.add_budget(rhs=1, sense='=')
 
 # Add box constraints (i.e., lower and upper bounds)
-constraints.add_box(lower=0, upper=0.2)
+constraints.add_box(lower=0, upper=0.2) #box = weights
 
 # Add linear constraints
 G = pd.DataFrame(np.zeros((2, N)), columns=constraints.ids)
@@ -120,8 +120,9 @@ GhAb
 risk_aversion = 3
 
 qp = QuadraticProgram(
+    #everything needs to be numpy arrays for qp
     P = covariance.matrix.to_numpy() * risk_aversion,
-    q = expected_return.vector.to_numpy() * -1,
+    q = expected_return.vector.to_numpy() * -1, #we minimise
     G = GhAb['G'],
     h = GhAb['h'],
     A = GhAb['A'],
@@ -133,9 +134,11 @@ qp = QuadraticProgram(
 
 qp.problem_data
 
-qp.is_feasible()
+qp.is_feasible() #check whether we could find a solution
 
 qp.solve()
+qp.results.get('solution')
+
 qp.objective_value()
 
 solution = qp.results.get('solution')
