@@ -131,6 +131,7 @@ venv/
 ENV/
 env.bak/
 venv.bak/
+venv_310
 
 # cache
 __pycache__
