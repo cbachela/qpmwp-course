@@ -18,14 +18,14 @@ import numpy as np
 import pandas as pd
 
 # Local modules imports
-from optimization.optimization import (
+from src.optimization.optimization import (
     Optimization,
     EmptyOptimization,
 )
-from optimization.optimization_data import OptimizationData
-from optimization.constraints import Constraints
-from backtesting.selection import Selection
-from backtesting.backtest_item_builder_classes import (
+from src.optimization.optimization_data import OptimizationData
+from src.optimization.constraints import Constraints
+from src.backtesting.selection import Selection
+from src.backtesting.backtest_item_builder_classes import (
     SelectionItemBuilder,
     OptimizationItemBuilder,
 )

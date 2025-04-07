@@ -19,12 +19,12 @@ import numpy as np
 import pandas as pd
 
 # Local modules
-from helper_functions import to_numpy
-from estimation.covariance import Covariance
-from estimation.expected_return import ExpectedReturn
-from optimization.optimization_data import OptimizationData
-from optimization.constraints import Constraints
-from optimization.quadratic_program import QuadraticProgram
+from src.helper_functions import to_numpy
+from src.estimation.covariance import Covariance
+from src.estimation.expected_return import ExpectedReturn
+from src.optimization.optimization_data import OptimizationData
+from src.optimization.constraints import Constraints
+from src.optimization.quadratic_program import QuadraticProgram
 
 
 
