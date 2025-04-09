@@ -173,50 +173,6 @@ def bibfn_selection_data_random(bs: 'BacktestService', rebdate: str, **kwargs) -
 
 
 
-# def bibfn_selection_ltr(bs, rebdate: str, **kwargs) -> pd.DataFrame:
-
-#     '''
-#     Backtest item builder function for defining the selection
-#     based on a Learn-to-Rank model.
-#     '''
-
-#     # Arguments
-#     params_xgb = kwargs.get('params_xgb')
-
-#     # Selection
-#     ids = bs.selection.selected
-
-#     # Extract data
-#     merged_df = bs.data.get('merged_df').copy()
-#     df_train = merged_df[merged_df['DATE'] < rebdate]#.reset_index(drop = True)
-#     df_test = merged_df[merged_df['DATE'] == rebdate]#.reset_index(drop = True)
-#     df_test = df_test[ df_test['ID'].isin(selected) ]
-#     ids = df_test['ID'].to_list()
-
-#     # Training data
-#     X_train = df_train.drop(['DATE', 'ID', 'label', 'ret'], axis=1)
-#     y_train = df_train['label']
-#     grouped_train = df_train.groupby('DATE').size().to_numpy()
-#     dtrain = xgb.DMatrix(X_train, label = y_train)
-#     dtrain.set_group(grouped_train)
-
-#     # Evaluation data
-#     X_test = df_test.drop(['DATE', 'ID', 'label', 'ret'], axis=1)
-#     grouped_test = df_test.groupby('DATE').size().to_numpy()
-#     dtest = xgb.DMatrix(X_test)
-#     dtest.set_group(grouped_test)
-
-#     # Train and predict
-#     bst = xgb.train(params_xgb, dtrain, 100)
-#     scores = bst.predict(dtest) * (-1)
-
-#     # # Extract feature importance
-#     # f_importance = bst.get_score(importance_type='gain')
-
-#     return pd.DataFrame({'values': scores,
-#                          'binary': np.ones(len(scores), dtype = int),
-#                         }, index = scores.index)
-
 
 
 
@@ -338,4 +294,53 @@ def bibfn_box_constraints(bs: 'BacktestService', rebdate: str, **kwargs) -> None
     bs.optimization.constraints.add_box(box_type = box_type,
                                         lower = lower,
                                         upper = upper)
+    return None
+
+def bibfn_size_dependent_upper_bounds(bs: 'BacktestService', rebdate: str, **kwargs) -> None:
+
+    '''
+    Backtest item builder function for setting the upper bounds
+    in dependence of a stock's market capitalization.
+    '''
+
+    # Arguments
+    small_cap = kwargs.get('small_cap', {'threshold': 300_000_000, 'upper': 0.02})
+    mid_cap = kwargs.get('small_cap', {'threshold': 1_000_000_000, 'upper': 0.05})
+    large_cap = kwargs.get('small_cap', {'threshold': 10_000_000_000, 'upper': 0.1})
+
+    # Selection
+    ids = bs.optimization.constraints.ids
+
+    # Data: market capitalization
+    mcap = bs.data.market_data['mktcap']
+    # Get last available valus for current rebdate
+    mcap = mcap[mcap.index.get_level_values('date') <= rebdate].groupby(
+        level = 'id'
+    ).last()
+
+    # Remove duplicates
+    mcap = mcap[~mcap.index.duplicated(keep=False)]
+    # Ensure that mcap contains all selected ids,
+    # possibly extend mcap with zero values
+    mcap = mcap.reindex(ids).fillna(0)
+
+    # Generate the upper bounds
+    upper = mcap * 0
+    upper[mcap > small_cap['threshold']] = small_cap['upper']
+    upper[mcap > mid_cap['threshold']] = mid_cap['upper']
+    upper[mcap > large_cap['threshold']] = large_cap['upper']
+
+    # Check if the upper bounds have already been set
+    if not bs.optimization.constraints.box['upper'].empty:
+        bs.optimization.constraints.add_box(
+            box_type = 'LongOnly',
+            upper = upper,
+        )
+    else:
+        # Update the upper bounds by taking the minimum of the current and the new upper bounds
+        bs.optimization.constraints.box['upper'] = np.minimum(
+            bs.optimization.constraints.box['upper'],
+            upper,
+        )
+
     return None

@@ -78,13 +78,11 @@ path_to_data = 'C:/Users/User/OneDrive/Documents/QPMwP/Data/'  # <change this to
 
 # Load market and jkp data from parquet files
 market_data = pd.read_parquet(path = f'{path_to_data}market_data.parquet')
-jkp_data = pd.read_parquet(path = f'{path_to_data}jkp_data.parquet')
 
 # Instantiate the BacktestData class
 # and set the market data and jkp data as attributes
 data = BacktestData()
 data.market_data = market_data
-data.jkp_data = jkp_data
 data.bm_series = load_data_spi(path='../data/')
 
 
@@ -95,13 +93,10 @@ data.bm_series = load_data_spi(path='../data/')
 # Prepare backtest service
 # --------------------------------------------------------------------------
 
-
 # Define rebalancing dates
-n_month = 3 # Rebalance every n_month months
-market_data_dates = market_data.index.get_level_values('date').unique()
-jkp_data_dates = jkp_data.index.get_level_values('date').unique()
-rebdates = jkp_data_dates[jkp_data_dates > market_data_dates[0]][::n_month].strftime('%Y-%m-%d').tolist()
-rebdates = [date for date in rebdates if date > '2002-01-01']
+n_days = 21*3  # Rebalance every n_month months
+market_data_dates = market_data.index.get_level_values('date').unique().sort_values()
+rebdates = market_data_dates[market_data_dates > '2005-01-01'][::n_days].strftime('%Y-%m-%d').tolist()
 rebdates
 
 
@@ -209,16 +204,24 @@ bt_mv.run(bs = bs)
 # --------------------------------------------------------------------------
 
 # Update the backtest service with a MeanVariance optimization object
-
+bs.optimization = MeanVariance(
+    covariance = Covariance(method = 'pearson'),
+    expected_return = ExpectedReturn(method = 'geometric'),
+    risk_aversion = 5,
+    solver_name = 'cvxopt',
+)
 
 # Instantiate the backtest object and run the backtest
-
+bt_mv_ra5 = Backtest()
 
 # Run the backtest
-
+bt_mv_ra5.run(bs = bs)
 
 # Save the backtest as a .pickle file
-
+# bt_mv_ra5.save(
+#     path = 'C:/Users/User/OneDrive/Documents/QPMwP/Backtests/',  # <change this to your path where you want to store the backtest>
+#     filename = 'backtest_mv_ra5.pickle' # <change this to your desired filename>
+# )
 
 
 
@@ -297,6 +300,8 @@ bt_mv_ra5_gaps.run(bs = bs)
 #     filename = 'backtest_mv_ra5_gaps.pickle' # <change this to your desired filename>
 # )
 
+bs.selection.df()
+bs.selection.df_binary().sum()
 
 
 
@@ -403,22 +408,24 @@ bt_mv_ra5_gaps_sdub.run(bs = bs)
 # Simulate strategies
 # --------------------------------------------------------------------------
 
+path = 'C:/Users/User/OneDrive/Documents/QPMwP/Backtests/' #<change this to your local path>
+
 # Laod backtests from pickle
 bt_mv = load_pickle(
     filename = 'backtest_mv.pickle',
-    path = 'C:/Users/User/OneDrive/Documents/QPMwP/Backtests/',
+    path = path,
 )
 bt_mv_ra5 = load_pickle(
     filename = 'backtest_mv_ra5.pickle',
-    path = 'C:/Users/User/OneDrive/Documents/QPMwP/Backtests/',
+    path = path,
 )
 bt_mv_ra5_gaps = load_pickle(
     filename = 'backtest_mv_ra5_gaps.pickle',
-    path = 'C:/Users/User/OneDrive/Documents/QPMwP/Backtests/',
+    path = path,
 )
 bt_mv_ra5_gaps_sdub = load_pickle(
     filename = 'backtest_mv_ra5_gaps_sdub.pickle',
-    path = 'C:/Users/User/OneDrive/Documents/QPMwP/Backtests/',
+    path = path,
 )
 
 # Simulate
@@ -452,12 +459,11 @@ sim_mv_ra5_gaps_sdub = bt_mv_ra5_gaps_sdub.strategy.simulate(
 sim = pd.concat({
     'bm': bs.data.bm_series,
     'mv': sim_mv,
-    # 'mv_ra5': sim_mv_ra5,
-    # 'mv_ra5_gaps': sim_mv_ra5_gaps,
-    # 'mv_ra5_gaps_sdub': sim_mv_ra5_gaps_sdub,
+    'mv_ra5': sim_mv_ra5,
+    'mv_ra5_gaps': sim_mv_ra5_gaps,
+    'mv_ra5_gaps_sdub': sim_mv_ra5_gaps_sdub,
 }, axis = 1).dropna()
-sim.columns = ['Benchmark', 'Mean-Variance', 'Mean-Variance RA5', 'Mean-Variance RA5 Gaps', 'Mean-Variance RA5 Gaps SDUB'][0:len(sim.columns)]
-
+sim.columns = ['Benchmark', 'Mean-Variance', 'Mean-Variance RA5', 'Mean-Variance RA5 Gaps', 'Mean-Variance RA5 Gaps SDUB']
 
 # Plot the cumulative performance
 np.log((1 + sim)).cumsum().plot(title='Cumulative Performance', figsize = (10, 6))

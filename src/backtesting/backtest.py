@@ -64,7 +64,8 @@ class Backtest:
                 print(f'Rebalancing date: {rebalancing_date}')
 
             # Prepare the rebalancing, i.e., the optimization problem
-            bs.prepare_rebalancing(rebalancing_date=rebalancing_date)
+            bs.prepare_rebalancing(rebalancing_date=rebalancing_date,
+                                   strategy=self.strategy)
 
             # Solve the optimization problem
             try:

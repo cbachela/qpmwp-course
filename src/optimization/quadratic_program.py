@@ -19,6 +19,9 @@ import numpy as np
 import qpsolvers
 import scipy.sparse as spa
 
+# Local modules imports
+from estimation.covariance import is_pos_def, make_pos_def
+
 
 
 
@@ -148,13 +151,15 @@ class QuadraticProgram():
         >>> qp.solve()
         >>> solution = qp.results['solution']
         '''
+
         if self.solver_settings['solver'] in ['ecos', 'scs', 'clarabel']:
             if self.problem_data.get('b').size == 1:
                 self.problem_data['b'] = np.array(self.problem_data['b']).reshape(-1)
 
-        # P = self.get('P')
-        # if P is not None and not isPD(P):
-        #     self['P'] = nearestPD(P)
+        # Ensure that the matrix P is positive definite
+        P = self.problem_data.get('P')
+        if P is not None and not is_pos_def(P):
+            self.problem_data['P'] = make_pos_def(P)
 
         # Create the problem
         problem = qpsolvers.Problem(
@@ -356,7 +361,7 @@ class QuadraticProgram():
 
     def linearize_turnover_objective(self,
                                      x_init: np.ndarray,
-                                     transaction_cost=0.002) -> None:
+                                     turnover_penalty=0.002) -> None:
         '''
         Linearize the turnover objective in the quadratic programming problem.
 
@@ -367,7 +372,7 @@ class QuadraticProgram():
         -----------
         x_init : np.ndarray
             The initial portfolio weights.
-        transaction_cost : float, optional
+        turnover_penalty : float, optional
             The transaction cost penalty per unit of turnover. Defaults to 0.002.
 
         Notes:
@@ -379,7 +384,7 @@ class QuadraticProgram():
         Examples:
         ---------
         >>> qp = QuadraticProgram(P, q, G, h, A, b, lb, ub, solver='cvxopt')
-        >>> qp.linearize_turnover_objective(x_init=np.array([0.1, 0.2, 0.3]), transaction_cost=0.002)
+        >>> qp.linearize_turnover_objective(x_init=np.array([0.1, 0.2, 0.3]), turnover_penalty=0.002)
         '''
         # Dimensions
         n = len(self.problem_data.get('q'))
@@ -392,7 +397,7 @@ class QuadraticProgram():
             else None
         )
         q = (
-            np.pad(self.problem_data['q'], (0, n), constant_values=transaction_cost)
+            np.pad(self.problem_data['q'], (0, n), constant_values=turnover_penalty)
             if self.problem_data.get('q') is not None
             else None
         )
@@ -445,4 +450,3 @@ class QuadraticProgram():
         })
 
         return None
-

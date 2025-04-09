@@ -126,8 +126,8 @@ qmj.plot(kind='density', title='Density of qmj')
 
 # Define rebalancing dates
 n_month = 3 # Rebalance every n_month months
-market_data_dates = market_data.index.get_level_values('date').unique()
-jkp_data_dates = jkp_data.index.get_level_values('date').unique()
+market_data_dates = market_data.index.get_level_values('date').unique().sort_values()
+jkp_data_dates = jkp_data.index.get_level_values('date').unique().sort_values()
 rebdates = jkp_data_dates[jkp_data_dates > market_data_dates[0]][::n_month].strftime('%Y-%m-%d').tolist()
 rebdates = [date for date in rebdates if date > '2002-01-01']
 rebdates

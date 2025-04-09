@@ -119,8 +119,8 @@ return_series_agg = (1 + return_series).cumprod().loc[train_dates].pct_change()
 return_series_agg
 
 # Shift the labels by -1 period (as we want to predict next period return ranks)
-# return_series_agg_shift = return_series_agg.shift(-1)
-return_series_agg_shift = return_series_agg   # ~~~~~~~~~~~~~~~~~~~~~~~~
+return_series_agg_shift = return_series_agg.shift(-1)
+# return_series_agg_shift = return_series_agg   # ~~~~~~~~~~~~~~~~~~~~~~~~
 
 # Stack the returns (from wide to long format)
 ret = return_series_agg_shift.unstack().reorder_levels([1, 0]).dropna()
@@ -160,8 +160,8 @@ df_test = merged_df[merged_df['date'] == split_date].reset_index(drop=True)
 X_train = (
     df_train.drop(['date', 'id', 'label', 'ret'], axis=1)
     # df_train.drop(['date', 'id', 'label'], axis=1)
-    .dropna(axis=1, how='all')
-    .dropna(axis=0, how='all')
+#    .dropna(axis=1, how='all')
+#    .dropna(axis=0, how='all')
     .fillna(0)
 )
 y_train = df_train['label'].loc[X_train.index]
@@ -185,11 +185,11 @@ dtest.set_group(grouped_test)
 # --------------------------------------------------------------------------
 
 params = {
-    'objective': 'rank:pairwise',  # Alternative objective for pairwise ranking.
-    # 'objective': 'rank:ndcg',  # Optimize for NDCG (Normalized Discounted Cumulative Gain), suitable for ranking tasks.
-    # 'ndcg_exp_gain': False,  # Disable exponential gain for NDCG calculation, useful for datasets with wide relevance ranges.
+    # 'objective': 'rank:pairwise',  # Alternative objective for pairwise ranking.
+    'objective': 'rank:ndcg',  # Optimize for NDCG (Normalized Discounted Cumulative Gain), suitable for ranking tasks.
+    'ndcg_exp_gain': False,  # Disable exponential gain for NDCG calculation, useful for datasets with wide relevance ranges.
     # 'eval_metric': 'ndcg@5',  # Evaluate NDCG at the top 5 items (commented out).
-    # 'eval_metric': 'ndcg',  # Evaluate NDCG across all items.
+    'eval_metric': 'ndcg',  # Evaluate NDCG across all items.
     'boosting_type': 'gbdt',  # Use Gradient Boosting Decision Trees as the boosting method.
     'min_child_weight': 1,  # Minimum sum of instance weights (hessian) in a child node to avoid overfitting.
     'max_depth': 6,  # Maximum depth of trees, controls model complexity and risk of overfitting.
