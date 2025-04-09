@@ -33,7 +33,7 @@ from optimization.quadratic_program import QuadraticProgram
 # TODO:
 
 # [ ] Add classes:
-#    [ ] MinVariance
+#    [x] MinVariance
 #    [ ] MaxReturn
 #    [ ] MaxSharpe
 #    [ ] MaxUtility
@@ -269,3 +269,61 @@ class MeanVariance(Optimization):
 
     def solve(self) -> None:
         return super().solve()
+
+
+
+class MinVariance(Optimization):
+
+    def __init__(self,
+                 constraints: Optional[Constraints] = None,
+                 covariance: Optional[Covariance] = None,
+                 **kwargs):
+        super().__init__(
+            constraints=constraints,
+            **kwargs
+        )
+        self.covariance = Covariance() if covariance is None else covariance
+
+    def set_objective(self, optimization_data: OptimizationData) -> None:
+        X = optimization_data['return_series']
+        covmat = self.covariance.estimate(X=X, inplace=False)
+        mu = np.zeros(X.shape[1])
+        self.objective = Objective(
+            q = mu ,
+            P = covmat * 2,
+        )
+        return None
+
+    def solve(self) -> None:
+        if self.params.get('solver_name') == 'analytical':
+            GhAb = self.constraints.to_GhAb()
+            if GhAb['G'] is not None:
+                raise ValueError(
+                    'Analytical solution does not exist whith inequality constraints.'
+                )
+            A = GhAb['A']
+            b = GhAb['b']
+            # If b is scalar, convert it to a 1D array
+            if isinstance(b, (int, float)):
+                b = np.array([b])
+            elif b.ndim == 0:
+                b = np.array([b])
+
+            P = self.objective.coefficients['P']
+            P_inv = np.linalg.inv(P)
+
+            AP_invA = A @ P_inv @ A.T
+            if AP_invA.shape[0] > 1:
+                AP_invA_inv = np.linalg.inv(AP_invA)
+            else:
+                AP_invA_inv = 1 / AP_invA
+            x = pd.Series(P_inv @ A.T @ AP_invA_inv @ b,
+                          index=self.constraints.ids)      
+            self.results.update({
+                'weights': x.to_dict(),
+                'status': True,
+            })
+            return None
+        else:
+            return super().solve()
+

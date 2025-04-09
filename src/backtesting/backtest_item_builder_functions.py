@@ -64,11 +64,13 @@ def bibfn_selection_NA(bs, rebdate: str, **kwargs) -> pd.Series:
 
     '''
     Backtest item builder function for defining the selection.
-    Filter stocks based on NA values.
+    Filters out stocks which have more than 'na_threshold' NA values in the
+    return series. Remaining NA values are filled with zeros.
     '''
 
     # Arguments
-    width = kwargs.get('width', 365)
+    width = kwargs.get('width', 252)
+    na_threshold = kwargs.get('na_threshold', 10)
 
     # Data: get return series
     return_series = bs.data.get_return_series(
@@ -77,20 +79,52 @@ def bibfn_selection_NA(bs, rebdate: str, **kwargs) -> pd.Series:
         fillna_value=None,
     )
 
-    # Drop columns with NA values
-    ids = return_series.columns
-    # ids_filtered = return_series.dropna(axis=1, how='any').columns
+    # Identify colums of return_series with more than 10 NA value
+    # and remove them from the selection
+    na_counts = return_series.isna().sum()
+    na_columns = na_counts[na_counts > na_threshold].index
 
     # Output
-    # filter_values = pd.Series(
-    #     ids.isin(ids_filtered),
-    #     index=ids,
-    #     name='binary'
-    # )
-    filter_values = pd.Series(1, index=ids, dtype=int, name='binary')
-    filter_values.loc[return_series.isna().any()] = 0
+    filter_values = pd.Series(1, index=na_counts.index, dtype=int, name='binary')
+    filter_values.loc[na_columns] = 0
 
     return filter_values.astype(int)
+
+
+
+def bibfn_selection_gaps(bs, rebdate: str, **kwargs) -> pd.Series:
+
+    '''
+    Backtest item builder function for defining the selection.
+    Drops elements from the selection when there is a gap
+    of more than n_days (i.e., consecutive zero's) in the volume series.
+    '''
+
+    # Arguments
+    width = kwargs.get('width', 252)
+    n_days = kwargs.get('n_days', 21)
+
+    # Volume data
+    vol = (
+        bs.data.get_volume_series(
+            end_date=rebdate,
+            width=width
+        ).fillna(0)
+    )
+
+    # Calculate the length of the longest consecutive zero sequence
+    def consecutive_zeros(column):
+        return (column == 0).astype(int).groupby(column.ne(0).astype(int).cumsum()).sum().max()
+
+    gaps = vol.apply(consecutive_zeros)
+
+    # Output
+    filter_values = pd.DataFrame({
+        'values': gaps,
+        'binary': (gaps <= n_days).astype(int),
+    }, index=gaps.index)
+
+    return filter_values
 
 
 

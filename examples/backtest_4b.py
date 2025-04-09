@@ -4,7 +4,7 @@
 
 # --------------------------------------------------------------------------
 # Cyril Bachelard
-# This version:     24.03.2025
+# This version:     31.03.2025
 # First version:    18.01.2025
 # --------------------------------------------------------------------------
 
@@ -16,10 +16,8 @@
 # pip install pyarrow fastparquet   # For reading and writing parquet files
 
 
-# This script demonstrates how to run a backtest using the qpmwp library
-# and single stock data which change over time.
-# The script uses the 'MeanVariance' portfolio optimization class.
-
+# This script builds upon the mean-variance optimization example (backtest_4.py)
+# and tries improve the performance.
 
 
 
@@ -33,6 +31,7 @@ import sys
 # Third party imports
 import numpy as np
 import pandas as pd
+import empyrical as ep
 
 # Add the project root directory to Python path
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -49,7 +48,6 @@ from estimation.covariance import Covariance
 from estimation.expected_return import ExpectedReturn
 from optimization.optimization import (
     MeanVariance,
-    LeastSquares,
 )
 from backtesting.backtest_item_builder_classes import (
     SelectionItemBuilder,
@@ -57,9 +55,7 @@ from backtesting.backtest_item_builder_classes import (
 )
 from backtesting.backtest_item_builder_functions import (
     bibfn_selection_min_volume,
-    bibfn_selection_NA,
     bibfn_return_series,
-    bibfn_bm_series,
     bibfn_budget_constraint,
     bibfn_box_constraints,
 )
@@ -93,30 +89,6 @@ data.bm_series = load_data_spi(path='../data/')
 
 
 
-# Helper methods that extract the certain columns from the data objects
-# from long format to wide format
-
-??data.get_return_series
-data.get_return_series()
-
-??data.get_volume_series
-data.get_volume_series()
-
-??data.get_characteristic_series
-data.get_characteristic_series(
-    field = 'qmj',
-)
-
-# Plot the density of the qmj characteristic (z-scores) for the last available date
-qmj = data.get_characteristic_series(
-    field = 'qmj',
-).tail(1).squeeze()
-qmj
-qmj.plot(kind='density', title='Density of qmj')
-
-
-
-    
 
 
 # --------------------------------------------------------------------------
@@ -150,7 +122,7 @@ rebdates
 
 selection_item_builders = {
     'min_volume': SelectionItemBuilder(
-        bibfn = bibfn_selection_min_volume,   # filter out stocks which are illiquid
+        bibfn = bibfn_selection_min_volume,   # filter out illiquid stocks
         width = 252,
         min_volume = 500_000,
         agg_fn = np.median,
@@ -172,67 +144,12 @@ selection_item_builders = {
 # Additional keyword arguments can be passed to bibfn using the arguments attribute of the OptimizationItemBuilder instance.
 
 
-
-def bibfn_bm_relative_upper_bounds(bs: 'BacktestService', rebdate: str, **kwargs) -> None:
-
-    '''
-    Backtest item builder function for setting the upper bounds
-    in dependence of a stock's market capitalization.
-    '''
-
-    # Arguments
-    multiple = kwargs.get('multiple', 20)
-
-    # Selection
-    # ids = bs.selection.selected
-    ids = bs.optimization.constraints.ids
-
-    # Data: market capitalization
-    mcap = bs.data.market_data['mktcap']
-    
-    
-    # Get last available valus for current rebdate
-    mcap[mcap.index.get_level_values('date') <= rebdate].tail(252).groupby(
-        level = 'id'
-    ).mean()    
-
-    # Remove duplicates
-    mcap = mcap[~mcap.index.duplicated(keep=False)]
-    # Ensure that mcap contains all selected ids,
-    # possibly extend mcap with zero values
-    mcap = mcap.reindex(ids).fillna(0)
-
-    # Compute the upper bounds
-    upper = (mcap / mcap.sum()) * multiple
-
-    # Check if the upper bounds have already been set
-    boxcon = bs.optimization.constraints.box
-    if not boxcon['upper']:
-        bs.optimization.constraints.add_box(
-            box_type = 'LongOnly',
-            upper = upper,
-        )
-    else:
-        # Update the upper bounds by taking the minimum of the current and the new upper bounds
-        bs.optimization.constraints.box['upper'] = np.minimum(
-            bs.optimization.constraints.box['upper'],
-            upper
-        )
-
-    return None
-
-
 optimization_item_builders = {
     'return_series': OptimizationItemBuilder(
         bibfn = bibfn_return_series,
         width = 252 * 3,
         fill_value = 0,
     ),
-    # 'bm_series': OptimizationItemBuilder(
-    #     bibfn = bibfn_bm_series,
-    #     width = 252 * 3,
-    #     align = True,
-    # ),
     'budget_constraint': OptimizationItemBuilder(
         bibfn = bibfn_budget_constraint,
         budget = 1
@@ -241,10 +158,6 @@ optimization_item_builders = {
         bibfn = bibfn_box_constraints,
         upper = 0.1
     ),
-    # 'box_constraints': OptimizationItemBuilder(
-    #     bibfn = bibfn_bm_relative_upper_bounds,
-    #     multiple = 20,
-    # ),
 }
 
 
@@ -263,12 +176,9 @@ bs = BacktestService(
 
 
 
-
-
 # --------------------------------------------------------------------------
-# Run backtest for mean-variance portfolio
+# Base model: mean-variance portfolio
 # --------------------------------------------------------------------------
-
 
 # Update the backtest service with a MeanVariance optimization object
 bs.optimization = MeanVariance(
@@ -294,100 +204,192 @@ bt_mv.run(bs = bs)
 
 
 
+# --------------------------------------------------------------------------
+# Adjustment 1: mean-variance portfolio with risk aversion of 5
+# --------------------------------------------------------------------------
 
 # Update the backtest service with a MeanVariance optimization object
-bs.optimization = MeanVariance(
-    covariance = Covariance(method = 'pearson'),
-    expected_return = ExpectedReturn(method = 'geometric'),
-    risk_aversion = 10,
-    solver_name = 'cvxopt',
+
+
+# Instantiate the backtest object and run the backtest
+
+
+# Run the backtest
+
+
+# Save the backtest as a .pickle file
+
+
+
+
+
+
+# --------------------------------------------------------------------------
+# Adjustment 2: gaps filter
+# --------------------------------------------------------------------------
+
+
+def bibfn_selection_gaps(bs, rebdate: str, **kwargs) -> pd.Series:
+
+    '''
+    Backtest item builder function for defining the selection.
+    Drops elements from the selection when there is a gap
+    of more than n_days (i.e., consecutive zero's) in the volume series.
+    '''
+
+    # Arguments
+    width = kwargs.get('width', 252)
+    n_days = kwargs.get('n_days', 21)
+
+    # Volume data
+    vol = (
+        bs.data.get_volume_series(
+            end_date=rebdate,
+            width=width
+        ).fillna(0)
+    )
+
+    # Calculate the length of the longest consecutive zero sequence
+    def consecutive_zeros(column):
+        return (column == 0).astype(int).groupby(column.ne(0).astype(int).cumsum()).sum().max()
+
+    gaps = vol.apply(consecutive_zeros)
+
+    # Output
+    filter_values = pd.DataFrame({
+        'values': gaps,
+        'binary': (gaps <= n_days).astype(int),
+    }, index=gaps.index)
+
+    return filter_values
+
+
+# Add the gaps filter to the selection_item_builders dictionary
+selection_item_builders['gaps'] = SelectionItemBuilder(
+    bibfn = bibfn_selection_gaps,
+    width = 252 * 3,
+    n_days = 10  # filter out stocks which have not been traded for more than 'n_days' consecutive days
+)
+
+# Reinitialize the backtest service with the gaps filter
+bs = BacktestService(
+    data = data,
+    optimization = MeanVariance(
+        covariance = Covariance(method = 'pearson'),
+        expected_return = ExpectedReturn(method = 'geometric'),
+        risk_aversion = 5,
+        solver_name = 'cvxopt',
+    ),
+    selection_item_builders = selection_item_builders,
+    optimization_item_builders = optimization_item_builders,
+    rebdates = rebdates,
 )
 
 # Instantiate the backtest object and run the backtest
-bt_mv_ra5 = Backtest()
+bt_mv_ra5_gaps = Backtest()
 
 # Run the backtest
-bt_mv_ra5.run(bs = bs)
+bt_mv_ra5_gaps.run(bs = bs)
 
 # # Save the backtest as a .pickle file
-# bt_mv_ra5.save(
+# bt_mv_ra5_gaps.save(
 #     path = 'C:/Users/User/OneDrive/Documents/QPMwP/Backtests/',  # <change this to your path where you want to store the backtest>
-#     filename = 'backtest_mv_ra5.pickle' # <change this to your desired filename>
+#     filename = 'backtest_mv_ra5_gaps.pickle' # <change this to your desired filename>
 # )
 
 
 
 
-
-
-
-
-
-
-
-# Inspect the optimization results - i.e. the weights stored in the strategy object
-bt_mv.strategy.get_weights_df()
-bt_mv.strategy.get_weights_df().plot(kind='bar', stacked=True, figsize=(10, 6))
-
-
-bs.selection.df()
-bs.selection.df_binary().sum()
-bs.selection.selected
-
-
-len(bs.optimization.constraints.box['upper'])
-len(bs.optimization.constraints.ids)
-
-
-
-
 # --------------------------------------------------------------------------
-# Run backtest for index tracking portfolio (via least squares optimization)
+# Adjustment 3: Size-dependent upper bounds
 # --------------------------------------------------------------------------
 
-bs.optimization = LeastSquares(
-    solver_name = 'cvxopt',
+def bibfn_size_dependent_upper_bounds(bs: 'BacktestService', rebdate: str, **kwargs) -> None:
+
+    '''
+    Backtest item builder function for setting the upper bounds
+    in dependence of a stock's market capitalization.
+    '''
+
+    # Arguments
+    small_cap = kwargs.get('small_cap', {'threshold': 300_000_000, 'upper': 0.02})
+    mid_cap = kwargs.get('small_cap', {'threshold': 1_000_000_000, 'upper': 0.05})
+    large_cap = kwargs.get('small_cap', {'threshold': 10_000_000_000, 'upper': 0.1})
+
+    # Selection
+    ids = bs.optimization.constraints.ids
+
+    # Data: market capitalization
+    mcap = bs.data.market_data['mktcap']
+    # Get last available valus for current rebdate
+    mcap = mcap[mcap.index.get_level_values('date') <= rebdate].groupby(
+        level = 'id'
+    ).last()
+
+    # Remove duplicates
+    mcap = mcap[~mcap.index.duplicated(keep=False)]
+    # Ensure that mcap contains all selected ids,
+    # possibly extend mcap with zero values
+    mcap = mcap.reindex(ids).fillna(0)
+
+    # Generate the upper bounds
+    upper = mcap * 0
+    upper[mcap > small_cap['threshold']] = small_cap['upper']
+    upper[mcap > mid_cap['threshold']] = mid_cap['upper']
+    upper[mcap > large_cap['threshold']] = large_cap['upper']
+
+    # Check if the upper bounds have already been set
+    if not bs.optimization.constraints.box['upper'].empty:
+        bs.optimization.constraints.add_box(
+            box_type = 'LongOnly',
+            upper = upper,
+        )
+    else:
+        # Update the upper bounds by taking the minimum of the current and the new upper bounds
+        bs.optimization.constraints.box['upper'] = np.minimum(
+            bs.optimization.constraints.box['upper'],
+            upper,
+        )
+
+    return None
+
+
+
+# Add the size-dependent upper bounds to the optimization_item_builders dictionary
+optimization_item_builders['size_dep_upper_bounds'] = OptimizationItemBuilder(
+    bibfn = bibfn_size_dependent_upper_bounds,
+    small_cap = {'threshold': 300_000_000, 'upper': 0.02},
+    mid_cap = {'threshold': 1_000_000_000, 'upper': 0.05},
+    large_cap = {'threshold': 10_000_000_000, 'upper': 0.1},
+)
+
+# Reinitialize the backtest service with the size-dependent upper bounds
+bs = BacktestService(
+    data = data,
+    optimization = MeanVariance(
+        covariance = Covariance(method = 'pearson'),
+        expected_return = ExpectedReturn(method = 'geometric'),
+        risk_aversion = 5,
+        solver_name = 'cvxopt',
+    ),
+    selection_item_builders = selection_item_builders,
+    optimization_item_builders = optimization_item_builders,
+    rebdates = rebdates[10:],
 )
 
 # Instantiate the backtest object and run the backtest
-bt_ls = Backtest()
+bt_mv_ra5_gaps_sdub = Backtest()
 
 # Run the backtest
-bt_ls.run(bs = bs)
+bt_mv_ra5_gaps_sdub.run(bs = bs)
 
 # # Save the backtest as a .pickle file
-# bt_ls.save(
+# bt_mv_ra5_gaps_sdub.save(
 #     path = 'C:/Users/User/OneDrive/Documents/QPMwP/Backtests/',  # <change this to your path where you want to store the backtest>
-#     filename = 'backtest_ls.pickle' # <change this to your desired filename>
+#     filename = 'backtest_mv_ra5_gaps_sdub.pickle' # <change this to your desired filename>
 # )
 
 
-
-
-# --------------------------------------------------------------------------
-# Prepare the optimization for a specific date and inspect the generated data items
-# i.e., the selection object, the optimization data and the optimization constraints
-# --------------------------------------------------------------------------
-
-rebalancing_date = rebdates[0]
-bs.build_selection(rebdate = rebalancing_date)
-bs.build_optimization(rebdate = rebalancing_date)
-
-
-# Inspect the selection for the last rebalancing date
-bs.selection.df()
-bs.selection.df_binary()
-bs.selection.df_binary().sum()
-bs.selection.selected
-bs.selection.filtered
-
-# Inspect the optimization data for the last rebalancing date
-bs.optimization_data
-
-# Inspect the optimization constraints
-bs.optimization.constraints.budget
-bs.optimization.constraints.box
-bs.optimization.constraints.linear
 
 
 
@@ -410,8 +412,12 @@ bt_mv_ra5 = load_pickle(
     filename = 'backtest_mv_ra5.pickle',
     path = 'C:/Users/User/OneDrive/Documents/QPMwP/Backtests/',
 )
-bt_ls = load_pickle(
-    filename = 'backtest_ls.pickle',
+bt_mv_ra5_gaps = load_pickle(
+    filename = 'backtest_mv_ra5_gaps.pickle',
+    path = 'C:/Users/User/OneDrive/Documents/QPMwP/Backtests/',
+)
+bt_mv_ra5_gaps_sdub = load_pickle(
+    filename = 'backtest_mv_ra5_gaps_sdub.pickle',
     path = 'C:/Users/User/OneDrive/Documents/QPMwP/Backtests/',
 )
 
@@ -430,24 +436,33 @@ sim_mv_ra5 = bt_mv_ra5.strategy.simulate(
     fc=fixed_costs,
     vc=variable_costs
 )
-sim_ls = bt_ls.strategy.simulate(
+sim_mv_ra5_gaps = bt_mv_ra5_gaps.strategy.simulate(
+    return_series=return_series,
+    fc=fixed_costs,
+    vc=variable_costs
+)
+sim_mv_ra5_gaps_sdub = bt_mv_ra5_gaps_sdub.strategy.simulate(
     return_series=return_series,
     fc=fixed_costs,
     vc=variable_costs
 )
 
+
 # Concatenate the simulations
 sim = pd.concat({
     'bm': bs.data.bm_series,
     'mv': sim_mv,
-    'mv_ra5': sim_mv_ra5,
-    'ls': sim_ls,
+    # 'mv_ra5': sim_mv_ra5,
+    # 'mv_ra5_gaps': sim_mv_ra5_gaps,
+    # 'mv_ra5_gaps_sdub': sim_mv_ra5_gaps_sdub,
 }, axis = 1).dropna()
-sim.columns = ['Benchmark', 'Mean-Variance', 'Mean-Variance RA5', 'Index Tracker']
+sim.columns = ['Benchmark', 'Mean-Variance', 'Mean-Variance RA5', 'Mean-Variance RA5 Gaps', 'Mean-Variance RA5 Gaps SDUB'][0:len(sim.columns)]
 
 
 # Plot the cumulative performance
 np.log((1 + sim)).cumsum().plot(title='Cumulative Performance', figsize = (10, 6))
+
+
 
 
 # Out-/Underperformance
@@ -469,9 +484,6 @@ np.log((1 + sim_rel)).cumsum().plot(title='Cumulative Out-/Underperformance', fi
 # --------------------------------------------------------------------------
 # Decriptive statistics
 # --------------------------------------------------------------------------
-
-import empyrical as ep
-
 
 # Compute individual performance metrics for each simulated strategy using empyrical
 annual_return = {}
