@@ -3,8 +3,8 @@
 ############################################################################
 
 # --------------------------------------------------------------------------
-# Cyril Bachelard
-# This version:     18.01.2025
+# Cyril Bachelard/Adrian Schmidli
+# This version:     14.04.2025
 # First version:    18.01.2025
 # --------------------------------------------------------------------------
 
@@ -113,15 +113,74 @@ class ExpectedReturn:
 # Functions
 # --------------------------------------------------------------------------
 
+# You don’t always need a scalefactor in mean computation — but it can be useful when you want to scale or adjust the result of a mean for a specific purpose.
 
 def mean_geometric(X: Union[pd.DataFrame, np.ndarray],
                    scalefactor: Union[float, int] = 1) -> Union[pd.Series, np.ndarray]:
+    """
+    Calculates the geometric mean of a list of numbers.
 
+    Data input: The parameter X can be either a pandas.DataFrame or a numpy.ndarray.
+    Def scalefactor: The argument scalefactor can be either a float or an int. It has a default value of one.
+
+    axis=0 → column-wise operations
+    axis=1 → row-wise operations
+
+    prod(1+X)^(1/n) - 1 = mean_geometric(X) → n = number of observations in the DataFrame or ndarray.
+
+    Data output: The function returns a pandas series or a numpy array, depending on the input type of X.
+    """
     mu = np.exp(np.log(1 + X).mean(axis=0) * scalefactor) - 1
     return mu
 
 def mean_arithmetic(X: Union[pd.DataFrame, np.ndarray],
                     scalefactor: Union[float, int] = 1) -> Union[pd.Series, np.ndarray]:
+    """
+    Calculates the arithmetic mean of a list of numbers.
+
+    Data input: The parameter X can be either a pandas.DataFrame or a numpy.ndarray.
+    Def scalefactor: The argument scalefactor can be either a float or an int. It has a default value of one.
+
+    axis=0 → column-wise operations
+    axis=1 → row-wise operations
+
+    sum(X) / n = mean_arithmetic(X) → n = number of observations in the DataFrame or ndarray.
+    
+    Data output: The function returns a pandas series or a numpy array, depending on the input type of X.
+    """
+    mu = X.mean(axis=0) * scalefactor
+    return mu
+
+def mean_harmonic(X: Union[pd.DataFrame, np.ndarray],
+                    scalefactor: Union[float, int] = 1) -> Union[pd.Series, np.ndarray]:
+    """
+    Calculates the harmonic mean of a list of numbers.
+
+    Data input: The parameter X can be either a pandas.DataFrame or a numpy.ndarray.
+    Def scalefactor: The argument scalefactor can be either a float or an int. It has a default value of one.
+    
+    axis=0 → column-wise operations
+    axis=1 → row-wise operations
+
+    n / sum(1/X) = mean_harmonic(X) → n = number of observations in the DataFrame or ndarray.
+    
+    Data output: The function returns a pandas series or a numpy array, depending on the input type of X.
+    """
+    mu = (len(X) / np.sum(1 / X, axis=0)) * scalefactor
+    return mu
+
+###################################################################################
+# Continue from here!!
+
+def mean_arithmetic(X: Union[pd.DataFrame, np.ndarray],
+                    scalefactor: Union[float, int] = 1) -> Union[pd.Series, np.ndarray]:
+    """
+    Data input: The parameter X can be either a pandas.DataFrame or a numpy.ndarray.
+    Def scalefactor: The argument scalefactor can be either a float or an int. It has a default value of one.
+    Data output: The function returns a pandas series or a numpy array, depending on the input type of X.
+
+
+    """
 
     mu = X.mean(axis=0) * scalefactor
     return mu
