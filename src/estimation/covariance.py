@@ -35,13 +35,13 @@ import pandas as pd
 
 
 # [ ] Add helper methods:
-#    [ ] is_pos_def
+#    [x] is_pos_def
 #    [ ] is_pos_semidef
 #    [ ] is_symmetric
 #    [ ] is_correlation_matrix
 #    [ ] is_diagonal
 #    [ ] make_symmetric
-#    [ ] make_pos_def
+#    [x] make_pos_def
 #    [ ] make_correlation_matrix (from covariance matrix)
 #    [ ] make_covariance_matrix (from correlation matrix)
 
@@ -53,11 +53,11 @@ class CovarianceSpecification(dict):
 
     def __init__(self,
                  method='pearson',
-                #  check_positive_definite=False,
+                 check_positive_definite=False,
                  **kwargs):
         super().__init__(
             method=method,
-            # check_positive_definite=check_positive_definite,
+            check_positive_definite=check_positive_definite,
         )
         self.update(kwargs)
 
@@ -114,9 +114,9 @@ class Covariance:
                 'Estimation method not recognized.'
             )
 
-        # if self.spec.get('check_positive_definite'):
-        #     if not isPD(covmat):
-        #         covmat = nearestPD(covmat)
+        if self.spec.get('check_positive_definite'):
+            if not is_pos_def(cov_matrix):
+                cov_matrix = make_pos_def(cov_matrix)
 
         if inplace:
             self.matrix = cov_matrix
@@ -139,3 +139,46 @@ def cov_pearson(X:  Union[pd.DataFrame, np.ndarray]) -> Union[pd.DataFrame, np.n
     else:
         covmat = np.cov(X, rowvar=False)
     return covmat
+
+
+
+def is_pos_def(B):
+    """Returns true when input is positive-definite, via Cholesky"""
+    try:
+        _ = np.linalg.cholesky(B)
+        return True
+    except np.linalg.LinAlgError:
+        return False
+
+
+def make_pos_def(A):
+    """Find the nearest positive-definite matrix to input
+
+    A Python/Numpy port of John D'Errico's `nearestSPD` MATLAB code [1], which
+    credits [2].
+
+    [1] https://www.mathworks.com/matlabcentral/fileexchange/42885-nearestspd
+
+    [2] N.J. Higham, "Computing a nearest symmetric positive semidefinite
+    matrix" (1988): https://doi.org/10.1016/0024-3795(88)90223-6
+    """
+
+    B = (A + A.T) / 2
+    _, s, V = np.linalg.svd(B)
+    H = np.dot(V.T, np.dot(np.diag(s), V))
+    A2 = (B + H) / 2
+    A3 = (A2 + A2.T) / 2
+
+    if is_pos_def(A3):
+        return A3
+
+    k = 1
+    while not is_pos_def(A3):
+        spacing = np.spacing(np.linalg.norm(A))
+        I = np.eye(A.shape[0])
+        mineig = np.min(np.real(np.linalg.eigvals(A3)))
+        A3 += I * (-mineig * k**2 + spacing)
+        k += 1
+
+    return A3
+

@@ -18,7 +18,7 @@ import numpy as np
 import pandas as pd
 
 # Local modules imports
-from backtesting.portfolio import Portfolio
+from backtesting.portfolio import Portfolio, floating_weights
 
 
 
@@ -111,8 +111,53 @@ class Strategy:
             return self.get_portfolio(yesterday)
 
     def turnover(self, return_series: pd.DataFrame, rescale: bool=True):
-    
-        raise NotImplementedError('The method turnover is not yet implemented.')
+
+        dates = self.get_rebalancing_dates()
+        to = {}
+        to[dates[0]] = float(1)
+        for rebalancing_date in dates[1:]:
+
+            previous_portfolio = self.get_previous_portfolio(rebalancing_date=rebalancing_date)
+            current_portfolio = self.get_portfolio(rebalancing_date=rebalancing_date)
+
+            if current_portfolio.rebalancing_date is None or previous_portfolio.rebalancing_date is None:
+                raise ValueError('Portfolios must have a rebalancing date')
+
+            if current_portfolio.rebalancing_date < previous_portfolio.rebalancing_date:
+                raise ValueError('The previous portfolio must be older than the current portfolio')
+
+            # Get the union of the ids of the weights in both portfolios
+            ids_union = list(
+                set(
+                    current_portfolio.weights.keys())
+                    .union(set(previous_portfolio.weights.keys())
+                )
+            )
+
+            # Extend the weights of the portfolio of the previous rebalancing
+            # to the the union of ids in both portfolios by adding zeros
+            w0 = pd.Series(previous_portfolio.weights, index=ids_union).fillna(0)
+
+            # Float the weights according to the price drifts in the market
+            # until the new rebalancing date
+            w_init = floating_weights(
+                X=return_series,
+                w=w0,
+                start_date=previous_portfolio.rebalancing_date,
+                end_date=current_portfolio.rebalancing_date,
+                rescale=rescale
+            )
+
+            # Extract the weights of the portfolio of the current rebalancing date
+            w_current = pd.Series(current_portfolio.weights, index=ids_union).fillna(0)
+
+            # Calculate the turnover
+            to[rebalancing_date] = (
+                pd.Series(w_init.iloc[-1])
+                .sub(pd.Series(w_current), fill_value=0)
+                .abs().sum()
+            )
+        return pd.Series(to)
 
     def simulate(self,
                  return_series: pd.DataFrame,
@@ -136,16 +181,27 @@ class Strategy:
                 rescale=False # Notice that rescale is hardcoded to False.
             )
             level = w_float.sum(axis=1)
-            ret_tmp = level.pct_change(1)  # 1 for one day lookback
+            ret_tmp = level.pct_change(1)
             ret_list.append(ret_tmp)
 
         portf_ret = pd.concat(ret_list).dropna()
 
         if vc != 0:
-            raise NotImplementedError('Variable costs are not yet implemented.')
+            # Calculate turnover and variable cost (vc) as a fraction of turnover
+            # Subtract the variable cost from the returns at each rebalancing date
+            to = self.turnover(return_series=return_series,
+                               rescale=False)
+            varcost = to * vc
+            portf_ret[0] -= varcost[0]
+            portf_ret[varcost[1:].index] -= varcost[1:].values
 
         if fc != 0:
-            raise NotImplementedError('Fixed costs are not yet implemented.')
+            # Calculate number of days between returns
+            # Calculate daily fixed cost based on the annual fixed cost (fc),
+            # the number of days between two rebalancings and the number of days per year.
+            # Subtract the daily fixed cost from the daily returns
+            n_days = (portf_ret.index[1:] - portf_ret.index[:-1]).to_numpy().astype('timedelta64[D]').astype(int)
+            fixcost = (1 + fc) ** (n_days / n_days_per_year) - 1
+            portf_ret[1:] -= fixcost
 
         return portf_ret
-

@@ -84,6 +84,25 @@ class Portfolio:
         else:
             return None
 
+    def initial_weights(self,
+                        selection: list[str],
+                        return_series: pd.DataFrame,
+                        end_date: str,
+                        rescale: bool = True) -> dict[str, float]:
+
+        w_init = dict.fromkeys(selection, 0)
+        if self.rebalancing_date is not None and self.weights is not None:
+            w_float = self.float_weights(
+                return_series = return_series,
+                end_date = end_date,
+                rescale = rescale
+            )
+            w_floated = w_float.iloc[-1]
+            for key in w_init.keys():
+                if key in w_floated.keys():
+                    w_init[key] = w_floated[key]
+        return w_init
+
 
 
 
@@ -94,6 +113,7 @@ class Portfolio:
 # --------------------------------------------------------------------------
 
 def floating_weights(X, w, start_date, end_date, rescale=True):
+
     start_date = pd.to_datetime(start_date)
     end_date = pd.to_datetime(end_date)
     if start_date < X.index[0]:
@@ -113,29 +133,11 @@ def floating_weights(X, w, start_date, end_date, rescale=True):
         raise ValueError('Not all assets in w are contained in X.')
 
     X_tmp = X.loc[start_date:end_date, wnames].copy().fillna(0)
-    # TODO : To extend to short positions cases when the weights can be negative
-    # short_positions = wnames[w.iloc[0,:] < 0 ]
-    # if len(short_positions) > 0:
-    #     X_tmp[short_positions] = X_tmp[short_positions] * (-1)
     xmat = 1 + X_tmp
-    # xmat.iloc[0] = w.dropna(how='all').fillna(0).abs()
     xmat.iloc[0] = w.dropna(how='all').fillna(0)
     w_float = xmat.cumprod()
 
     if rescale:
-        w_float_long = (
-            w_float.where(w_float >= 0)
-            .div(w_float[w_float >= 0].abs().sum(axis=1), axis='index')
-            .fillna(0)
-        )
-        w_float_short = (
-            w_float.where(w_float < 0)
-            .div(w_float[w_float < 0].abs().sum(axis=1), axis='index')
-            .fillna(0)
-        )
-        w_float = pd.DataFrame(
-            w_float_long + w_float_short, index=xmat.index, columns=wnames
-        )
+        w_float = w_float.div(w_float.sum(axis=1), axis='index')
 
     return w_float
-

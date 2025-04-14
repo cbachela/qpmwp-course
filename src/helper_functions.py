@@ -4,14 +4,15 @@
 
 # --------------------------------------------------------------------------
 # Cyril Bachelard
-# This version:     18.01.2025
+# This version:     24.03.2025
 # First version:    18.01.2025
 # --------------------------------------------------------------------------
 
 
 # Standard library imports
 import os
-from typing import Optional, Union
+import pickle
+from typing import Optional, Union, Any
 
 # Third party imports
 import numpy as np
@@ -47,6 +48,41 @@ def load_data_msci(path: Optional[str] = None, n: int = 24) -> dict[str, pd.Data
                     date_format='%d-%m-%Y')
 
     return {'return_series': X, 'bm_series': y}
+
+
+
+def load_data_spi(path: Optional[str] = None) -> pd.Series:
+
+    '''
+    Loads daily total return series of the swiss performance index
+    '''
+
+    path = os.path.join(os.getcwd(), f'data{os.sep}') if path is None else path
+
+    # Load swiss performance index return series
+    df = pd.read_csv(os.path.join(path, 'spi_index.csv'),
+                        index_col=0,
+                        header=0,
+                        parse_dates=True,
+                        date_format='%d/%m/%Y')
+    df.index = pd.DatetimeIndex(df.index)
+    return df.squeeze()
+
+
+
+def load_pickle(filename: str,
+                path: Optional[str] = None) -> Union[Any, None]:
+    if path is not None:
+        filename = os.path.join(path, filename)
+    try:
+        with open(filename, "rb") as f:
+            return pickle.load(f)
+    except EOFError:
+        print("Error: Ran out of input. The file may be empty or corrupted.")
+        return None
+    except Exception as ex:
+        print("Error during unpickling object:", ex)
+    return None
 
 
 

@@ -150,13 +150,13 @@ rebdates
 # or datasets which are added to the instance of the OptimizationData class.
 
 # The function bibfn takes the backtest service (bs) and the rebalancing date (rebdate) as arguments.
-# Additional keyword arguments can be passed to bibfn using the arguments attribute of the 
+# Additional keyword arguments can be passed to bibfn using the arguments attribute of the
 # OptimizationItemBuilder instance.
 
 optimization_item_builders = {
     'return_series': OptimizationItemBuilder(
         bibfn = bibfn_return_series,
-        width = 365 * 3,
+        width = 256 * 3,
     ),
 }
 
@@ -206,12 +206,6 @@ bt_mv.strategy.get_weights_df().plot(
     kind='bar', stacked=True, figsize=(10, 6),
     title='Mean-Variance Portfolio Weights'
 )
-
-
-
-
-
-
 
 
 

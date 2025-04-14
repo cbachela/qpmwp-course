@@ -19,6 +19,9 @@ import numpy as np
 import qpsolvers
 import scipy.sparse as spa
 
+# Local modules imports
+from estimation.covariance import is_pos_def, make_pos_def
+
 
 
 
@@ -148,13 +151,15 @@ class QuadraticProgram():
         >>> qp.solve()
         >>> solution = qp.results['solution']
         '''
+
         if self.solver_settings['solver'] in ['ecos', 'scs', 'clarabel']:
             if self.problem_data.get('b').size == 1:
                 self.problem_data['b'] = np.array(self.problem_data['b']).reshape(-1)
 
-        # P = self.get('P')
-        # if P is not None and not isPD(P):
-        #     self['P'] = nearestPD(P)
+        # Ensure that the matrix P is positive definite
+        P = self.problem_data.get('P')
+        if P is not None and not is_pos_def(P):
+            self.problem_data['P'] = make_pos_def(P)
 
         # Create the problem
         problem = qpsolvers.Problem(
@@ -263,3 +268,185 @@ class QuadraticProgram():
         q = self.problem_data['q']
 
         return (0.5 * (x @ P @ x) + q @ x).item() + constant
+
+    def linearize_turnover_constraint(self, x_init: np.ndarray, to_budget=float('inf')) -> None:
+        '''
+        Linearize the turnover constraint in the quadratic programming problem.
+
+        This method modifies the quadratic programming problem to include a linearized turnover constraint.
+
+        Parameters:
+        -----------
+        x_init : np.ndarray
+            The initial portfolio weights.
+        to_budget : float, optional
+            The maximum allowable turnover. Defaults to float('inf').
+
+        Notes:
+        ------
+        - The method updates the problem's objective function coefficients, inequality constraints,
+        equality constraints, and bounds to account for the turnover constraint.
+        - The original problem data is overridden with the updated matrices and vectors.
+
+        Examples:
+        ---------
+        >>> qp = QuadraticProgram(P, q, G, h, A, b, lb, ub, solver='cvxopt')
+        >>> qp.linearize_turnover_constraint(x_init=np.array([0.1, 0.2, 0.3]), to_budget=0.05)
+        '''
+        # Dimensions
+        n = len(self.problem_data.get('q'))
+        m = 0 if self.problem_data.get('G') is None else self.problem_data.get('G').shape[0]
+
+        # Coefficients of the objective function
+        P = (
+            np.pad(self.problem_data['P'], (0, n))
+            if self.problem_data.get('P') is not None
+            else None
+        )
+        q = (
+            np.pad(self.problem_data['q'], (0, n))
+            if self.problem_data.get('q') is not None
+            else None
+        )
+
+        # Inequality constraints
+        G = np.zeros(shape=(m + 2 * n + 1, 2 * n))
+        if self.problem_data.get('G') is not None:
+            G[0:m, 0:n] = self.problem_data.get('G')
+        G[m:(m + n), 0:n] = np.eye(n)
+        G[m:(m + n), n:(2 * n)] = np.eye(n) * (-1)
+        G[(m + n):(m + 2 * n), 0:n] = np.eye(n) * (-1)
+        G[(m + n):(m + 2 * n), n:(2 * n)] = np.eye(n) * (-1)
+        G[(m + 2 * n),] = np.append(np.zeros(n), np.ones(n))
+        h = (
+            self.problem_data.get('h')
+            if self.problem_data.get('h') is not None
+            else np.empty(shape=(0,))
+        )
+        h = np.append(h, np.append(np.append(x_init, -x_init), to_budget))
+
+        # Equality constraints
+        if self.problem_data.get('A') is not None:
+            if len(self.problem_data['A'].shape) == 1:
+                A = np.pad(self.problem_data['A'], (0, n))
+            else:
+                A = np.pad(self.problem_data['A'], ((0, 0), (0, n)))
+        else:
+            A = None
+
+        # Lower and upper bounds
+        lb = (
+            np.pad(self.problem_data['lb'], (0, n))
+            if self.problem_data.get('lb') is not None
+            else None
+        )
+        ub = (
+            np.pad(self.problem_data['ub'], (0, n), constant_values=float('inf'))
+            if self.problem_data.get('ub') is not None
+            else None
+        )
+
+        # Override the original matrices (notice: b does not change)
+        self.update_problem_data({
+            'P': P,
+            'q': q,
+            'G': G,
+            'h': h,
+            'A': A,
+            'lb': lb,
+            'ub': ub
+        })
+
+        return None
+
+    def linearize_turnover_objective(self,
+                                     x_init: np.ndarray,
+                                     turnover_penalty=0.002) -> None:
+        '''
+        Linearize the turnover objective in the quadratic programming problem.
+
+        This method modifies the quadratic programming problem to include a 
+        linearized turnover penalty term in the objective.
+
+        Parameters:
+        -----------
+        x_init : np.ndarray
+            The initial portfolio weights.
+        turnover_penalty : float, optional
+            The transaction cost penalty per unit of turnover. Defaults to 0.002.
+
+        Notes:
+        ------
+        - The method updates the problem's objective function coefficients, inequality constraints,
+        equality constraints, and bounds to account for the turnover objective.
+        - The original problem data is overridden with the updated matrices and vectors.
+
+        Examples:
+        ---------
+        >>> qp = QuadraticProgram(P, q, G, h, A, b, lb, ub, solver='cvxopt')
+        >>> qp.linearize_turnover_objective(x_init=np.array([0.1, 0.2, 0.3]), turnover_penalty=0.002)
+        '''
+        # Dimensions
+        n = len(self.problem_data.get('q'))
+        m = 0 if self.problem_data.get('G') is None else self.problem_data.get('G').shape[0]
+
+        # Coefficients of the objective function
+        P = (
+            np.pad(self.problem_data['P'], (0, n))
+            if self.problem_data.get('P') is not None
+            else None
+        )
+        q = (
+            np.pad(self.problem_data['q'], (0, n), constant_values=turnover_penalty)
+            if self.problem_data.get('q') is not None
+            else None
+        )
+
+        # Inequality constraints
+        G = np.zeros(shape=(m + 2 * n, 2 * n))
+        if self.problem_data.get('G') is not None:
+            G[0:m, 0:n] = self.problem_data.get('G')
+        G[m:(m + n), 0:n] = np.eye(n)
+        G[m:(m + n), n:(2 * n)] = -np.eye(n)
+        G[(m + n):(m + 2 * n), 0:n] = -np.eye(n)
+        G[(m + n):(m + 2 * n), n:(2 * n)] = -np.eye(n)
+        h = (
+            self.problem_data.get('h')
+            if self.problem_data.get('h') is not None
+            else np.empty(shape=(0,))
+        )
+        h = np.append(h, np.append(x_init, -x_init))
+
+        # Equality constraints
+        if self.problem_data.get('A') is not None:
+            if len(self.problem_data['A'].shape) == 1:
+                A = np.pad(self.problem_data['A'], (0, n))
+            else:
+                A = np.pad(self.problem_data['A'], ((0, 0), (0, n)))
+        else:
+            A = None
+
+        # Lower and upper bounds
+        lb = (
+            np.pad(self.problem_data['lb'], (0, n))
+            if self.problem_data.get('lb') is not None
+            else None
+        )
+        ub = (
+            np.pad(self.problem_data['ub'], (0, n), constant_values=float('inf'))
+            if self.problem_data.get('ub') is not None
+            else None
+        )
+
+        # Override the original matrices (notice: b does not change)
+        self.update_problem_data({
+            'P': P,
+            'q': q,
+            'G': G,
+            'h': h,
+            'A': A,
+            'lb': lb,
+            'ub': ub,
+        })
+
+        return None

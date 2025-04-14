@@ -169,4 +169,4 @@ cython_debug/
 # # Data
 # Data
 # Data/
-data/*
+# data/*

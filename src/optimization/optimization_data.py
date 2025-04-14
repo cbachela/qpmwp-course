@@ -29,8 +29,8 @@ class OptimizationData(dict):
     kwargs: Additional keyword arguments to initialize the dictionary.
     '''
 
-    def __init__(self, align: bool = True, lags: dict = {}, **kwargs):
-        super().__init__(**kwargs)
+    def __init__(self, align=True, lags={}, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.__dict__ = self
         if len(lags) > 0:
             for key in lags.keys():
@@ -38,35 +38,9 @@ class OptimizationData(dict):
         if align:
             self.align_dates()
 
-    def align_dates(self, variable_names: Optional[list[str]] = None) -> None:
-        '''
-        Align dates across specified variables.
-
-        Parameters:
-        variable_names (Optional[list[str]]): List of variable names to align.
-        If None, align all variables.
-        '''
-        if variable_names is None:
-            variable_names = self.keys()
-        index = self.intersecting_dates(variable_names=list(variable_names))
-        for key in variable_names:
-            self[key] = self[key].loc[index]
-        return None
-
     def intersecting_dates(self,
                            variable_names: Optional[list[str]] = None,
                            dropna: bool = True) -> pd.DatetimeIndex:
-        '''
-        Find intersecting dates across specified variables.
-
-        Parameters:
-        variable_names (Optional[list[str]]): List of variable names to consider.
-        If None, consider all variables.
-        dropna (bool): Whether to drop NaN values.
-
-        Returns:
-        pd.DatetimeIndex: Intersecting dates.
-        '''
         if variable_names is None:
             variable_names = list(self.keys())
         if dropna:
@@ -76,3 +50,15 @@ class OptimizationData(dict):
         for variable_name in variable_names:
             index = index.intersection(self.get(variable_name).index)
         return index
+
+    def align_dates(self,
+                    variable_names: Optional[list[str]] = None,
+                    dropna: bool = True) -> None:
+        if variable_names is None:
+            variable_names = self.keys()
+        index = self.intersecting_dates(
+            variable_names=list(variable_names), dropna=dropna
+        )
+        for key in variable_names:
+            self[key] = self[key].loc[index]
+        return None
