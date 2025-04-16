@@ -119,8 +119,8 @@ return_series_agg = (1 + return_series).cumprod().loc[train_dates].pct_change()
 return_series_agg
 
 # Shift the labels by -1 period (as we want to predict next period return ranks)
-return_series_agg_shift = return_series_agg.shift(-1)
-# return_series_agg_shift = return_series_agg   # ~~~~~~~~~~~~~~~~~~~~~~~~
+# return_series_agg_shift = return_series_agg.shift(-1)
+return_series_agg_shift = return_series_agg   # ~~~~~~~~~~~~~~~~~~~~~~~~
 
 # Stack the returns (from wide to long format)
 ret = return_series_agg_shift.unstack().reorder_levels([1, 0]).dropna()
@@ -190,12 +190,10 @@ params = {
     'ndcg_exp_gain': False,  # Disable exponential gain for NDCG calculation, useful for datasets with wide relevance ranges.
     # 'eval_metric': 'ndcg@5',  # Evaluate NDCG at the top 5 items (commented out).
     'eval_metric': 'ndcg',  # Evaluate NDCG across all items.
-    'boosting_type': 'gbdt',  # Use Gradient Boosting Decision Trees as the boosting method.
     'min_child_weight': 1,  # Minimum sum of instance weights (hessian) in a child node to avoid overfitting.
     'max_depth': 6,  # Maximum depth of trees, controls model complexity and risk of overfitting.
     'eta': 0.1,  # Learning rate, controls the contribution of each tree to the model.
     'gamma': 1.0,  # Minimum loss reduction required for a split, higher values make the model more conservative.
-    'n_estimators': 100,  # Number of boosting rounds (trees) to train.
     'lambda': 1,  # L2 regularization term to reduce overfitting.
     'alpha': 0,  # L1 regularization term to reduce overfitting.
 }
@@ -213,7 +211,7 @@ model = xgb.train(params, dtrain, 100)
 preds = model.predict(dtest)
 ranks = pd.Series(preds).rank(method='first', ascending=True).astype(int)
 y_pred = (100 * ranks / len(ranks)).astype(int)  # Normalize the ranks to be between 0 and 100
-
+y_pred
 
 
 # --------------------------------------------------------------------------
@@ -223,7 +221,7 @@ y_pred = (100 * ranks / len(ranks)).astype(int)  # Normalize the ranks to be bet
 # Predictions vs. true (future) labels
 out = pd.concat([
     y_pred,
-    y_test.astype(int), 
+    y_test.astype(int),
     df_test['ret']
 ], axis=1)
 out.index.name = 'id'
@@ -235,7 +233,6 @@ out.plot(kind='scatter', x='y_true', y='ret')
 
 out.sort_values('y_pred', ascending=False).head(10)
 out.sort_values('y_true', ascending=False).head(10)
-
 
 
 # Calculate the NDCG score

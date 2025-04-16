@@ -307,7 +307,7 @@ bs.optimization = MeanVariance(
     expected_return = expected_return,
     risk_aversion = risk_aversion,
     solver_name = solver_name,
-    turnover_penalty = 0.001,  # Turnover penalty in the objective function
+    turnover_penalty = 1,  # Turnover penalty in the objective function
 )
 
 # Instantiate the backtest object
@@ -321,6 +321,7 @@ bt_mv_to_pnlty.run(bs = bs)
 #     path = 'C:/Users/User/OneDrive/Documents/QPMwP/Backtests/',  # <change this to your path where you want to store the backtest>
 #     filename = 'backtest_mv_to_pnlty.pickle' # <change this to your desired filename>
 # )
+
 
 
 

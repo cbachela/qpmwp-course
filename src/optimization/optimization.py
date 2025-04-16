@@ -339,3 +339,49 @@ class MinVariance(Optimization):
         else:
             return super().solve()
 
+
+class ScoreVariance(Optimization):
+
+    def __init__(self,
+                 field: str,
+                 constraints: Optional[Constraints] = None,
+                 covariance: Optional[Covariance] = None,
+                 risk_aversion: float = 1,
+                 **kwargs):
+        super().__init__(
+            field=field,
+            constraints=constraints,
+            risk_aversion=risk_aversion,
+            **kwargs,
+        )
+        self.covariance = Covariance() if covariance is None else covariance
+
+    def set_objective(self, optimization_data: OptimizationData) -> None:
+
+        # Arguments
+        risk_aversion = self.params.get('risk_aversion')
+        field = self.params.get('field')
+        if field is None:
+            raise ValueError('Field must be specified.')
+
+        # Extract the scores from the optimization data
+        scores = optimization_data['scores'][field]
+
+        # Create quadratic part of the objective function
+        # If risk aversion is not None and not equal to 0, use covariance matrix
+        if risk_aversion is not None and risk_aversion != 0:
+            P = self.covariance.estimate(
+                X=optimization_data['return_series'],
+                inplace=False
+            ) * 2 * risk_aversion
+        else:
+            P = np.zeros(shape = (len(scores), len(scores)))
+        self.objective = Objective(
+            q = scores * (-1),
+            P = P,
+        )
+
+        return None
+
+    def solve(self) -> None:
+        return super().solve()

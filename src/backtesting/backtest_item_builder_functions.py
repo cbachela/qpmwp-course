@@ -296,6 +296,7 @@ def bibfn_box_constraints(bs: 'BacktestService', rebdate: str, **kwargs) -> None
                                         upper = upper)
     return None
 
+
 def bibfn_size_dependent_upper_bounds(bs: 'BacktestService', rebdate: str, **kwargs) -> None:
 
     '''
@@ -341,6 +342,25 @@ def bibfn_size_dependent_upper_bounds(bs: 'BacktestService', rebdate: str, **kwa
         bs.optimization.constraints.box['upper'] = np.minimum(
             bs.optimization.constraints.box['upper'],
             upper,
+        )
+
+    return None
+
+
+def bibfn_turnover_constraint(bs, rebdate: str, **kwargs) -> None:
+    """
+    Function to assign a turnover constraint to the optimization.
+    """
+    if rebdate > bs.settings['rebdates'][0]:
+
+        # Arguments
+        turnover_limit = kwargs.get('turnover_limit')
+
+        # Constraints
+        bs.optimization.constraints.add_l1(
+            name = 'turnover',
+            rhs = turnover_limit,
+            x0 = bs.optimization.params['x_init'],
         )
 
     return None
