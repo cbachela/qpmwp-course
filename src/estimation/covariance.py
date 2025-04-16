@@ -54,7 +54,7 @@ class CovarianceSpecification(dict):
     def __init__(self,
                  method='pearson', 
                 #now only one method - pearson
-                #  check_positive_definite=False
+                 check_positive_definite=False,
                  **kwargs):
         super().__init__(
             method=method,
