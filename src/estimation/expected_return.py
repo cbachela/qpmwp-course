@@ -33,7 +33,7 @@ import pandas as pd
 
 
 class ExpectedReturnSpecification(dict):
-
+#if we want to extend possibilities, we need to change this specification part
     def __init__(self,
                  method='geometric',
                  scalefactor=1,

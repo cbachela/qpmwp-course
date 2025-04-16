@@ -147,6 +147,7 @@ optimization_item_builders = {
         name = 'bm_series',
     ),
 }
+#bm_series is the benchmark series used for comparison of performances
 
 
 # Initialize the backtest service

@@ -24,6 +24,8 @@ import pandas as pd
 class Constraints:
 
     def __init__(self, ids: list[str] = ['NA']):
+        #ids make sure we dont impose constraints on something that does not exist in the portfolio 
+        #(so the ids are just the country names we had for optimization 2)
         self.ids = ids
         self.budget = {'Amat': None, 'sense': None, 'rhs': None}
         self.box = {'box_type': 'NA', 'lower': None, 'upper': None}
