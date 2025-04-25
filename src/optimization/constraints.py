@@ -93,7 +93,7 @@ class Constraints:
         if np.isscalar(boxcon['upper']):
             boxcon['upper'] = pd.Series(np.repeat(float(boxcon['upper']), len(self.ids)), index=self.ids)
 
-        if (boxcon['upper'] < boxcon['lower']).any():
+        if (boxcon['upper'] < boxcon['lower']).any(): 
             raise ValueError("Some lower bounds are higher than the corresponding upper bounds.")
 
         self.box = boxcon

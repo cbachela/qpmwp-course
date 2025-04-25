@@ -23,9 +23,9 @@ import pandas as pd
 
 # - Add a docstrings
 
-# [ ] Add mean estimator functions:
-# [ ] mean_harmonic ✅
-# [ ] mean_ewm (exponential weighted) ✅
+# [X] Add mean estimator functions:
+#   [x] mean_harmonic
+#   [x] mean_ewm (exponential weighted)
 
 
 
