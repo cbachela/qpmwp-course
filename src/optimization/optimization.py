@@ -16,8 +16,13 @@ from typing import Optional
 import sys
 import os
 
-# Add two levels up — the `src/` folder
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
+# Automatically find project root from notebook location
+project_root = os.path.dirname(os.path.dirname(os.getcwd()))
+src_path = os.path.join(project_root, 'src')
+
+# Add src/ to sys.path (only once)
+if src_path not in sys.path:
+    sys.path.append(src_path)
 
 # Third party imports
 import numpy as np
