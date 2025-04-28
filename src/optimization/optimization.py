@@ -13,16 +13,6 @@
 # Standard library imports
 from abc import ABC, abstractmethod
 from typing import Optional
-import sys
-import os
-
-# Automatically find project root from notebook location
-project_root = os.path.dirname(os.path.dirname(os.getcwd()))
-src_path = os.path.join(project_root, 'src')
-
-# Add src/ to sys.path (only once)
-if src_path not in sys.path:
-    sys.path.append(src_path)
 
 # Third party imports
 import numpy as np
