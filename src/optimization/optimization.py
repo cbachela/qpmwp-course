@@ -17,6 +17,11 @@ from typing import Optional
 # Third party imports
 import numpy as np
 import pandas as pd
+import sys
+import os
+
+# Dynamically add the `src` folder to the path
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 # Local modules
 from helper_functions import to_numpy
@@ -25,6 +30,7 @@ from estimation.expected_return import ExpectedReturn
 from optimization.optimization_data import OptimizationData
 from optimization.constraints import Constraints
 from optimization.quadratic_program import QuadraticProgram
+
 
 
 
@@ -338,4 +344,3 @@ class MinVariance(Optimization):
             return None
         else:
             return super().solve()
-
