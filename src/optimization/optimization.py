@@ -13,15 +13,15 @@
 # Standard library imports
 from abc import ABC, abstractmethod
 from typing import Optional
+import sys
+import os
+
+# Add two levels up — the `src/` folder
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 
 # Third party imports
 import numpy as np
 import pandas as pd
-import sys
-import os
-
-# Dynamically add the `src` folder to the path
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 # Local modules
 from helper_functions import to_numpy
