@@ -49,6 +49,7 @@ class Constraints:
             warnings.warn("Existing budget constraint is overwritten\n")
 
         a_values = pd.Series(np.ones(len(self.ids)), index=self.ids)
+        a_values = pd.DataFrame(a_values).T # shows the matrix "Amat" in the right format (1 row and n columns).
         self.budget = {'Amat': a_values,
                        'sense': sense,
                        'rhs': rhs}
@@ -105,6 +106,7 @@ class Constraints:
                    sense: str = '=',
                    rhs=None,
                    name: str = None) -> None:
+        # Definition of the function inputs and there data types.
         if G is None:
             if g_values is None:
                 raise ValueError("Either 'G' or 'g_values' must be provided.")
@@ -112,17 +114,23 @@ class Constraints:
                 G = pd.DataFrame(g_values).T.reindex(columns=self.ids).fillna(0)
                 if name is not None:
                     G.index = [name]
+        # If the matrix G is not provided, it is created from the g_values vector.
+        # If the g-value vectors do not match all column ID's of the G matrix, the missing columns are filled with 0.
+        # Defining the "name" variable would add some names to the constraints row-wise. If the variable "name" is not defined, the rows would be named with the default index of the pandas dataframe (0, 1, 2, ...).
 
         if isinstance(sense, str):
             sense = pd.Series([sense])
+        # If "sense" is a string, it is converted into a one-element pandas series.
 
         if isinstance(rhs, (int, float)):
             rhs = pd.Series([rhs])
+        # If "rhs" is a integer or a float, it is converted into a one-element pandas series.
 
         if self.linear['G'] is not None:
             G = pd.concat([self.linear['G'], G], axis=0, ignore_index=False)
             sense = pd.concat([self.linear['sense'], sense], axis=0, ignore_index=False)
             rhs = pd.concat([self.linear['rhs'], rhs], axis=0, ignore_index=False)
+        # If the linear constraints are already defined, the new constraints are added to the existing ones.
 
         G.fillna(0, inplace=True)
 

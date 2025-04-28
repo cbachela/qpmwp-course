@@ -125,8 +125,8 @@ def mean_geometric(X: Union[pd.DataFrame, np.ndarray],
     Data input: The parameter X can be either a pandas.DataFrame or a numpy.ndarray.
     Def. scalefactor: The argument scalefactor can be either a float or an int. It has a default value of one.
 
-    axis=0 → column-wise operations
-    axis=1 → row-wise operations
+    axis=0 → row-wise operations
+    axis=1 → column-wise operations
 
     prod(1+X)^(1/n) - 1 = mean_geometric(X) → n = number of observations in the DataFrame or ndarray.
 
@@ -143,8 +143,8 @@ def mean_arithmetic(X: Union[pd.DataFrame, np.ndarray],
     Data input: The parameter X can be either a pandas.DataFrame or a numpy.ndarray.
     Def. scalefactor: The argument scalefactor can be either a float or an int. It has a default value of one.
 
-    axis=0 → column-wise operations
-    axis=1 → row-wise operations
+    axis=0 → row-wise operations
+    axis=1 → column-wise operations
 
     sum(X) / n = mean_arithmetic(X) → n = number of observations in the DataFrame or ndarray.
     
@@ -161,8 +161,8 @@ def mean_harmonic(X: Union[pd.DataFrame, np.ndarray],
     Data input: The parameter X can be either a pandas.DataFrame or a numpy.ndarray.
     Def. scalefactor: The argument scalefactor can be either a float or an int. It has a default value of one.
     
-    axis=0 → column-wise operations
-    axis=1 → row-wise operations
+    axis=0 → row-wise operations
+    axis=1 → column-wise operations
 
     (n / sum(1/(1+X))) - 1 = mean_harmonic(X) → n = number of observations in the DataFrame or ndarray.
     
