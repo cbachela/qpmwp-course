@@ -17,10 +17,6 @@
 # pip install -r requirements.txt
 
 
-# Comment: Adrian Schmidli
-# also run these commands above and than try to execute the marked code with shift + enter!!! 
-
-
 # Standard library imports
 import os
 
