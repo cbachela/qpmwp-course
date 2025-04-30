@@ -1,11 +1,12 @@
 ############################################################################
-### QPMwP CODING EXAMPLES - BACKTESTING - LEARNING TO RANK (LTR)
+### QPMwP CODING EXAMPLES - BACKTESTING - 
+### LEARNING TO RANK (LTR) IN COMBINATION WITH BLACK-LITTERMAN (BL)
 ############################################################################
 
 # --------------------------------------------------------------------------
 # Cyril Bachelard
-# This version:     14.04.2025
-# First version:    27.03.2025
+# This version:     28.04.2025
+# First version:    28.03.2025
 # --------------------------------------------------------------------------
 
 
@@ -19,7 +20,9 @@
 
 
 # This script demonstrates the application of Learning to Rank to predict
-# the cross-sectional ordering of stock returns within a backtest framework.
+# the cross-sectional ordering of stock returns within a backtest framework and combines
+# it with the Black-Litterman model for portfolio optimization.
+
 
 
 
@@ -32,6 +35,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import xgboost as xgb
+from xgboost import XGBRegressor
 from sklearn.metrics import ndcg_score
 
 # Add the project root directory to Python path
@@ -46,19 +50,29 @@ from helper_functions import (
     load_pickle,
 )
 from estimation.covariance import Covariance
-from optimization.optimization import ScoreVariance  # ---- New !
+from estimation.black_litterman import (
+    bl_posterior_mean,                              # NEW!
+    generate_views_from_scores,                     # NEW!
+)
+from optimization.optimization import (
+    BlackLitterman,                                 # NEW!
+)
 from backtesting.backtest_item_builder_classes import (
     SelectionItemBuilder,
     OptimizationItemBuilder,
 )
 from backtesting.backtest_item_builder_functions import (
+    # Selection item builder functions
     bibfn_selection_min_volume,
     bibfn_selection_gaps,
-    bibfn_size_dependent_upper_bounds,
+    bibfn_selection_ltr,
+    # Optimization item builder functions
     bibfn_return_series,
+    bibfn_cap_weights,                              # NEW!
+    bibfn_scores_ltr,
+    # Constraints item builder functions
     bibfn_budget_constraint,
     bibfn_box_constraints,
-    bibfn_turnover_constraint,
 )
 from backtesting.backtest_data import BacktestData
 from backtesting.backtest_service import BacktestService
@@ -76,7 +90,7 @@ from backtesting.backtest import Backtest
 # - swiss performance index, SPI (from csv file)
 # --------------------------------------------------------------------------
 
-path_to_data = '/Users/sarah/qpmwp-course/data/' 
+path_to_data = 'C:/Users/User/OneDrive/Documents/QPMwP/Data/'  # <change this to your path to data>
 
 # Load market and jkp data from parquet files
 market_data = pd.read_parquet(path = f'{path_to_data}market_data.parquet')
@@ -179,88 +193,6 @@ data.merged_df = merged_df
 # Prepare backtest service
 # --------------------------------------------------------------------------
 
-def bibfn_selection_ltr(bs: 'BacktestService', rebdate: str, **kwargs) -> None:
-    '''
-    This function constructs labels and features for a specific rebalancing date.
-    It acts as a filtering since stocks which could not be labeled or which
-    do not have features are excluded from the selection.
-    '''
-
-    # Define the selection by the ids available for the current rebalancing date
-    df_test = bs.data.merged_df[bs.data.merged_df['date'] == rebdate]
-    ids = list(df_test['id'].unique())
-
-    # Return a binary series indicating the selected stocks
-    return pd.Series(1, index=ids, name='binary', dtype=int)
-
-
-
-
-
-
-def bibfn_scores_ltr(bs: 'BacktestService', rebdate: str, **kwargs) -> None:
-
-    '''
-    Constructs scores based on a Learning-to-Rank model.        
-    '''
-
-    # Arguments
-    params_xgb = kwargs.get('params_xgb')
-    if params_xgb is None or not isinstance(params_xgb, dict):
-        raise ValueError('params_xgb is not defined or not a dictionary.')
-    training_dates = kwargs.get('training_dates')
-
-    # Extract data
-    df_train = bs.data.merged_df[bs.data.merged_df['date'] < rebdate]
-    df_test = bs.data.merged_df[bs.data.merged_df['date'] == rebdate]
-    df_test = df_test.loc[df_test['id'].drop_duplicates(keep='first').index]
-    df_test = df_test.loc[df_test['id'].isin(bs.selection.selected)]
-
-    # Training data
-    X_train = (
-        df_train.drop(['date', 'id', 'label', 'ret'], axis=1)
-        # df_train.drop(['date', 'id', 'label'], axis=1)  # Include ret in the features as a proof of concept
-    )
-    y_train = df_train['label'].loc[X_train.index]
-    grouped_train = df_train.groupby('date').size().to_numpy()
-    dtrain = xgb.DMatrix(X_train, label=y_train)
-    dtrain.set_group(grouped_train)
-
-    # Test data
-    y_test = pd.Series(df_test['label'].values, index=df_test['id'])
-    X_test = df_test.drop(['date', 'id', 'label', 'ret'], axis=1)
-    # X_test = df_test.drop(['date', 'id', 'label'], axis=1)  # Include ret in the features as a proof of concept
-    grouped_test = df_test.groupby('date').size().to_numpy()
-    dtest = xgb.DMatrix(X_test)
-    dtest.set_group(grouped_test)
-
-    # Train the model using the training data
-    if rebdate in training_dates:
-        model = xgb.train(params_xgb, dtrain, 100)
-        bs.model_ltr = model
-    else:
-        # Use the previous model for the current rebalancing date
-        model = bs.model_ltr
-
-    # Predict using the test data
-    pred = model.predict(dtest)
-    preds =  pd.Series(pred, df_test['id'], dtype='float64')
-    ranks = preds.rank(method='first', ascending=True).astype(int)
-
-    # Output
-    scores = pd.concat({
-        'scores': preds,
-        'ranks': (100 * ranks / len(ranks)).astype(int),  # Normalize the ranks to be between 0 and 100
-        'true': y_test,
-        'ret': pd.Series(df_test['ret'].values, index=df_test['id']),
-    }, axis=1)
-    bs.optimization_data['scores'] = scores
-    return None
-
-
-
-
-
 
 # Define the selection item builders.
 selection_item_builders = {
@@ -275,7 +207,7 @@ selection_item_builders = {
         min_volume = 500_000,
         agg_fn = np.median,
     ),
-    'ltr': SelectionItemBuilder(     # ------ NEW !
+    'ltr': SelectionItemBuilder(
         bibfn = bibfn_selection_ltr,
     ),
 }
@@ -288,12 +220,16 @@ optimization_item_builders = {
         width = 252*3,
         fill_value = 0,
     ),
-    'scores_ltr': OptimizationItemBuilder(     # ------ NEW !
+    'cap_weights': OptimizationItemBuilder(        # NEW!
+        bibfn = bibfn_cap_weights,
+    ),
+    'scores_ltr': OptimizationItemBuilder(
         bibfn = bibfn_scores_ltr,
         params_xgb = {
-            'objective': 'rank:ndcg',
-            'ndcg_exp_gain': False,
-            'eval_metric': 'ndcg@10',
+            'objective': 'rank:pairwise',
+            # 'objective': 'rank:ndcg',
+            # 'ndcg_exp_gain': False,
+            # 'eval_metric': 'ndcg@10',
             'min_child_weight': 1,
             'max_depth': 6,
             'eta': 0.1,
@@ -301,16 +237,16 @@ optimization_item_builders = {
             'lambda': 1,
             'alpha': 0,
         },
-        # training_dates = train_dates,
-        training_dates = train_dates[train_dates <= rebdates[0]],  # Only train on the first rebalancing
+        # training_dates = train_dates[train_dates <= rebdates[0]],  # Only train on the first rebalancing
+        training_dates = train_dates,
     ),
     'budget_constraint': OptimizationItemBuilder(
         bibfn = bibfn_budget_constraint,
-        budget = 1
+        budget = 1,
     ),
     'box_constraints': OptimizationItemBuilder(
         bibfn = bibfn_box_constraints,
-        upper = 0.1
+        upper = 1,
     ),
 }
 
@@ -321,6 +257,16 @@ optimization_item_builders = {
 # Initialize the backtest service
 bs = BacktestService(
     data = data,
+    optimization=BlackLitterman(
+        solver_name='cvxopt',
+        covariance=Covariance(method='pearson'),
+        risk_aversion=1,
+        tau_psi=0.01,
+        tau_omega=0.0001,
+        # view_method='quintile',
+        view_method='absolute',
+        fields=['scores'],
+    ),
     selection_item_builders = selection_item_builders,
     optimization_item_builders = optimization_item_builders,
     rebdates = rebdates,
@@ -329,181 +275,32 @@ bs = BacktestService(
 
 
 
-
-
-
 # --------------------------------------------------------------------------
 # Run backtests
 # --------------------------------------------------------------------------
 
-
-# Update the backtest service with a ScoreVariance optimization object
-bs.optimization = ScoreVariance(
-    field = 'scores',
-    covariance = Covariance(method = 'pearson'),
-    risk_aversion = 1,
-    solver_name = 'cvxopt',
-)
-
-# Instantiate the backtest object and run the backtest
-bt_sv = Backtest()
-
-# Run the backtest
-bt_sv.run(bs=bs)
+bt_bl_ltr = Backtest()
+bt_bl_ltr.run(bs=bs)
 
 # # Save the backtest as a .pickle file
-# bt_sv.save(
+# bt_bl_ltr.save(
 #     path = 'C:/Users/User/OneDrive/Documents/QPMwP/Backtests/',  # <change this to your path where you want to store the backtest>
-#     filename = 'backtest_sv_retrain_monthly.pickle' # <change this to your desired filename>
-# )
-
-
-
-
-xgb.plot_importance(bs.model_ltr, importance_type='weight', max_num_features=20, title='Feature Importance (weight)')
-xgb.plot_importance(bs.model_ltr, importance_type='gain', max_num_features=20, title='Feature Importance (gain)')
-
-
-
-
-
-
-
-
-
-# --------------------------------------------------------------------------
-# Run backtest v2: Adding size-dependent upper bounds
-# --------------------------------------------------------------------------
-
-
-# Reinitialize the backtest service with the size-dependent upper bounds
-bs = BacktestService(
-    data = data,
-    optimization = ScoreVariance(
-        field = 'scores',
-        covariance = Covariance(method = 'pearson'),
-        risk_aversion = 1,
-        solver_name = 'cvxopt',
-    ),
-    selection_item_builders = selection_item_builders,
-    optimization_item_builders = {
-        **optimization_item_builders,
-        'size_dep_upper_bounds': OptimizationItemBuilder(
-            bibfn = bibfn_size_dependent_upper_bounds,
-            small_cap = {'threshold': 300_000_000, 'upper': 0.02},
-            mid_cap = {'threshold': 1_000_000_000, 'upper': 0.05},
-            large_cap = {'threshold': 10_000_000_000, 'upper': 0.1},
-        ),
-    },
-    rebdates = rebdates,
-)
-
-# Instantiate the backtest object and run the backtest
-bt_sv_sdub = Backtest()
-
-# Run the backtest
-bt_sv_sdub.run(bs=bs)
-
-# # Save the backtest as a .pickle file
-# bt_sv_sdub.save(
-#     path = 'C:/Users/User/OneDrive/Documents/QPMwP/Backtests/',  # <change this to your path where you want to store the backtest>
-#     filename = 'backtest_sv_sdub.pickle' # <change this to your desired filename>
+#     filename = 'backtest_bl_ltr.pickle' # <change this to your desired filename>
 # )
 
 
 
 
 
+Mu = pd.concat({
+    'mu_prior': bs.optimization.objective.coefficients['mu_implied'],
+    'mu_posterior': bs.optimization.objective.coefficients['mu_posterior'],
+}, axis=1) * 252
+
+Mu.plot(kind='bar', title='Expected Returns', figsize=(10, 6))
+Mu.iloc[0:10,:].plot(kind='bar', title='Expected Returns', figsize=(10, 6))
 
 
-
-
-
-# --------------------------------------------------------------------------
-# Run backtest v3: Adding turnover constraint
-# --------------------------------------------------------------------------
-
-
-# Reinitialize the backtest service with the size-dependent upper bounds
-bs = BacktestService(
-    data = data,
-    optimization = ScoreVariance(
-        field = 'scores',
-        covariance = Covariance(method = 'pearson'),
-        risk_aversion = 1,
-        solver_name = 'cvxopt',
-    ),
-    selection_item_builders = selection_item_builders,
-    optimization_item_builders = {
-        **optimization_item_builders,
-        'size_dep_upper_bounds': OptimizationItemBuilder(
-            bibfn = bibfn_size_dependent_upper_bounds,
-            small_cap = {'threshold': 300_000_000, 'upper': 0.02},
-            mid_cap = {'threshold': 1_000_000_000, 'upper': 0.05},
-            large_cap = {'threshold': 10_000_000_000, 'upper': 0.1},
-        ),
-        'turnover_constraint': OptimizationItemBuilder(
-            bibfn = bibfn_turnover_constraint,
-            turnover_limit = 0.25,
-        ),
-    },
-    rebdates = rebdates,
-)
-
-# Instantiate the backtest object and run the backtest
-bt_sv_sdub_tocon = Backtest()
-
-# Run the backtest
-bt_sv_sdub_tocon.run(bs=bs)
-
-# # Save the backtest as a .pickle file
-# bt_sv_sdub_tocon.save(
-#     path = 'C:/Users/User/OneDrive/Documents/QPMwP/Backtests/',  # <change this to your path where you want to store the backtest>
-#     filename = 'backtest_sv_sdub_tocon.pickle' # <change this to your desired filename>
-# )
-
-
-
-
-
-
-
-# --------------------------------------------------------------------------
-# Run backtest v4: Adding turnover constraint, no size-dependent upper bounds
-# --------------------------------------------------------------------------
-
-
-# Reinitialize the backtest service with the size-dependent upper bounds
-bs = BacktestService(
-    data = data,
-    optimization = ScoreVariance(
-        field = 'scores',
-        covariance = Covariance(method = 'pearson'),
-        risk_aversion = 1,
-        solver_name = 'cvxopt',
-    ),
-    selection_item_builders = selection_item_builders,
-    optimization_item_builders = {
-        **optimization_item_builders,
-        'turnover_constraint': OptimizationItemBuilder(
-            bibfn = bibfn_turnover_constraint,
-            turnover_limit = 0.25,
-        ),
-    },
-    rebdates = rebdates,
-)
-
-# Instantiate the backtest object and run the backtest
-bt_sv_tocon = Backtest()
-
-# Run the backtest
-bt_sv_tocon.run(bs=bs)
-
-# # Save the backtest as a .pickle file
-# bt_sv_tocon.save(
-#     path = 'C:/Users/User/OneDrive/Documents/QPMwP/Backtests/',  # <change this to your path where you want to store the backtest>
-#     filename = 'backtest_sv_tocon.pickle' # <change this to your desired filename>
-# )
 
 
 
@@ -519,32 +316,18 @@ bt_sv_tocon.run(bs=bs)
 
 
 # Laod backtests from pickle
-path = '/Users/sarah/qpmwp-course//Backtests/' #<change this to your local path>
+path = 'C:/Users/User/OneDrive/Documents/QPMwP/Backtests/' #<change this to your local path>
 
-bt_sv = load_pickle(
-    filename = 'backtest_sv.pickle',
-    path = path,
-)
-bt_sv_poc = load_pickle(
-    filename = 'backtest_sv_poc.pickle',
+
+bt_bl_ltr = load_pickle(
+    filename = 'backtest_bl_ltr.pickle',
     path = path,
 )
 bt_sv_retrain_monthly = load_pickle(
     filename = 'backtest_sv_retrain_monthly.pickle',
     path = path,
 )
-bt_sv_sdub = load_pickle(
-    filename = 'backtest_sv_sdub.pickle',
-    path = path,
-)
-bt_sv_sdub_tocon = load_pickle(
-    filename = 'backtest_sv_sdub_tocon.pickle',
-    path = path,
-)
-bt_sv_tocon = load_pickle(
-    filename = 'backtest_sv_tocon.pickle',
-    path = path,
-)
+
 
 
 
@@ -553,12 +336,8 @@ variable_costs = 0.002
 return_series = bs.data.get_return_series()
 
 strategy_dict = {
-    # 'sv_poc': bt_sv_poc.strategy,
-    'sv': bt_sv.strategy,
+    'bl_ltr': bt_bl_ltr.strategy,
     'sv_retrain_monthly': bt_sv_retrain_monthly.strategy,
-    # 'sv_sdub': bt_sv_sdub.strategy,
-    # 'sv_sdub_tocon': bt_sv_sdub_tocon.strategy,
-    # 'sv_tocon': bt_sv_tocon.strategy,
 }
 
 sim_dict_gross = {
@@ -578,13 +357,11 @@ sim_dict_net = {
     for key, value in strategy_dict.items()
 }
 
-
 sim = pd.concat({
     'bm': bs.data.bm_series,
-    **sim_dict_gross,
+    # **sim_dict_gross,
     **sim_dict_net,
 }, axis = 1).dropna()
-
 
 
 
@@ -602,16 +379,16 @@ np.log((1 + sim)).cumsum().plot(title='Cumulative Performance', figsize = (10, 6
 # Turnover
 # --------------------------------------------------------------------------
 
-to_sv = bt_sv.strategy.turnover(return_series=return_series)
-to_sv_tocon = bt_sv_tocon.strategy.turnover(return_series=return_series)
+to_bl_ltr = bt_bl_ltr.strategy.turnover(return_series=return_series)
+to_sv_retrain_monthly = bt_sv_retrain_monthly.strategy.turnover(return_series=return_series)
 
 to = pd.concat({
-    'sv': to_sv,
-    'sv_tocon': to_sv_tocon,
+    'bl_lstr': to_bl_ltr,
+    'sv_retrain_monthly': to_sv_retrain_monthly,
 }, axis = 1).dropna()
 to.columns = [
-    'Score-Variance',
-    'Score-Variance with Turnover Constraint',
+    'Black-Litterman with LTR',
+    'Score-Variance, retrain monthly',
 ]
 
 to.plot(title='Turnover', figsize = (10, 6))

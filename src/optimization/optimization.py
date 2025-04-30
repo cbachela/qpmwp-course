@@ -22,6 +22,10 @@ import pandas as pd
 from helper_functions import to_numpy
 from estimation.covariance import Covariance
 from estimation.expected_return import ExpectedReturn
+from estimation.black_litterman import (
+    bl_posterior_mean,
+    generate_views_from_scores,
+)
 from optimization.optimization_data import OptimizationData
 from optimization.constraints import Constraints
 from optimization.quadratic_program import QuadraticProgram
@@ -250,6 +254,110 @@ class LeastSquares(Optimization):
     def solve(self) -> None:
         return super().solve()
 
+
+
+class BlackLitterman(Optimization):
+
+    def __init__(self,
+                 fields: list[str],
+                 covariance: Optional[Covariance] = None,
+                 risk_aversion: float = 1,
+                 tau_psi: float = 1,
+                 tau_omega: float = 1,
+                 view_method: str = 'absolute',
+                 scalefactor: int = 1,
+                 **kwargs) -> None:
+        super().__init__(
+            fields=fields,
+            risk_aversion=risk_aversion,
+            tau_psi=tau_psi,
+            tau_omega=tau_omega,
+            view_method=view_method,
+            scalefactor=scalefactor,
+            **kwargs
+        )
+        self.covariance = Covariance() if covariance is None else covariance
+
+    def set_objective(self, optimization_data: OptimizationData) -> None:
+        '''
+        Sets the objective function for the optimization problem.
+        
+        Parameters:
+        training_data: Training data which must contain 
+            return series (to compute the covariances) and scores.
+        '''
+
+        # Retrieve configuration parameters from the params attribute
+        fields = self.params.get('fields')
+        risk_aversion = self.params.get('risk_aversion')
+        tau_psi = self.params.get('tau_psi')
+        tau_omega = self.params.get('tau_omega')
+        view_method = self.params.get('view_method')
+        scalefactor = self.params.get('scalefactor')
+
+        # Calculate the covariance matrix
+        self.covariance.estimate(
+            X=optimization_data['return_series'],
+            inplace=True,
+        )
+
+        # Extract benchmark weights
+        cap_weights = optimization_data['cap_weights']
+
+        # # Alternatively, calculate minimum tracking error portfolio
+        # optim = LeastSquares(
+        #     constraints = self.constraints,
+        #     solver_name = self.params.get('solver_name'),
+        # )
+        # optim.set_objective(optimization_data=optimization_data)
+        # optim.solve()
+        # cap_weights = pd.Series(optim.results['weights'])
+
+        # Implied expected return of benchmark
+        mu_implied = risk_aversion * self.covariance.matrix @ cap_weights
+
+        # Extract scores
+        scores = optimization_data['scores'][fields]
+
+        # Construct the views
+        P_tmp = {}
+        q_tmp = {}
+        for col in scores.columns:
+            P_tmp[col], q_tmp[col] = generate_views_from_scores(
+                scores=scores[col],
+                mu_implied=mu_implied,
+                method=view_method,
+                scalefactor=scalefactor,
+            )
+
+        P = pd.concat(P_tmp, axis=0)
+        q = pd.concat(q_tmp, axis=0)
+
+        # Define the uncertainty of the views
+        Omega = pd.DataFrame(
+            np.diag([tau_omega] * len(q)),
+            index=q.index,
+            columns=q.index
+        )
+        Psi = self.covariance.matrix * tau_psi
+
+        # Compute the posterior expected return vector
+        mu_posterior = bl_posterior_mean(
+            mu_prior=mu_implied,
+            P=P,
+            q=q,
+            Psi=Psi,
+            Omega=Omega,
+        )
+
+        self.objective = Objective(
+            q = mu_posterior * (-1),
+            P = self.covariance.matrix * risk_aversion * 2,
+        )
+        return None
+
+    def solve(self) -> None:
+        return super().solve()
 
 
 

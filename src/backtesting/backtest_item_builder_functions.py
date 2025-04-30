@@ -14,7 +14,7 @@
 # Third party imports
 import numpy as np
 import pandas as pd
-
+import xgboost as xgb
 
 
 
@@ -172,7 +172,52 @@ def bibfn_selection_data_random(bs: 'BacktestService', rebdate: str, **kwargs) -
 
 
 
+def bibfn_selection_ltr(bs: 'BacktestService', rebdate: str, **kwargs) -> None:
+    '''
+    This function constructs labels and features for a specific rebalancing date.
+    It acts as a filtering since stocks which could not be labeled or which
+    do not have features are excluded from the selection.
+    '''
 
+    # Define the selection by the ids available for the current rebalancing date
+    df_test = bs.data.merged_df[bs.data.merged_df['date'] == rebdate]
+    ids = list(df_test['id'].unique())
+
+    # Return a binary series indicating the selected stocks
+    return pd.Series(1, index=ids, name='binary', dtype=int)
+
+
+
+def bibfn_selection_jkp_factor_scores(bs, rebdate: str, **kwargs) -> pd.DataFrame:
+
+    '''
+    Backtest item builder function for defining the selection.
+    Filter stocks based on available scores in the jkp factor data.
+    '''
+
+    # Arguments
+    fields = kwargs.get('fields')
+
+    # Selection
+    ids = bs.selection.selected
+    if ids is None:
+        ids = bs.data.jkp_data.index.get_level_values('id').unique()
+
+    # Filter rows prior to the rebdate and within one year
+    df = bs.data.jkp_data[fields]
+    filtered_df = df.loc[
+        (df.index.get_level_values('date') < rebdate) &
+        (df.index.get_level_values('date') >= pd.to_datetime(rebdate) - pd.Timedelta(days=365))
+    ]
+
+    # Extract the last available value for each id
+    scores = filtered_df.groupby('id').last()
+
+    # Output
+    filter_values = scores.copy()
+    filter_values['binary'] = scores.notna().all(axis=1).astype(int)
+
+    return filter_values
 
 
 
@@ -259,6 +304,105 @@ def bibfn_bm_series(bs: 'BacktestService', rebdate: str, **kwargs) -> None:
         )
 
     return None
+
+
+
+def bibfn_cap_weights(bs: 'BacktestService', rebdate: str, **kwargs) -> None:
+
+    # Selection
+    ids = bs.selection.selected
+
+    # Data - market capitalization
+    mcap = bs.data.market_data['mktcap']
+
+    # Get last available values for current rebdate
+    mcap = mcap[mcap.index.get_level_values('date') <= rebdate].groupby(
+        level = 'id'
+    ).last()
+
+    # Remove duplicates
+    mcap = mcap[~mcap.index.duplicated(keep=False)].loc[ids]
+
+    # Attach cap-weights to the optimization data object
+    bs.optimization_data['cap_weights'] = mcap / mcap.sum()
+
+    return None
+
+
+def bibfn_scores(bs: 'BacktestService', rebdate: str, **kwargs) -> None:
+
+    '''
+    Copies scores from the selection object to the optimization data object
+    '''
+
+    ids = bs.selection.selected
+    scores = bs.selection.filtered['scores'].loc[ids]
+    # Drop the 'binary' column
+    bs.optimization_data['scores'] = scores.drop(columns=['binary'])
+    return None
+
+
+def bibfn_scores_ltr(bs: 'BacktestService', rebdate: str, **kwargs) -> None:
+
+    '''
+    Constructs scores based on a Learning-to-Rank model.        
+    '''
+
+    # Arguments
+    params_xgb = kwargs.get('params_xgb')
+    if params_xgb is None or not isinstance(params_xgb, dict):
+        raise ValueError('params_xgb is not defined or not a dictionary.')
+    training_dates = kwargs.get('training_dates')
+
+    # Extract data
+    df_train = bs.data.merged_df[bs.data.merged_df['date'] < rebdate]
+    df_test = bs.data.merged_df[bs.data.merged_df['date'] == rebdate]
+    df_test = df_test.loc[df_test['id'].drop_duplicates(keep='first').index]
+    df_test = df_test.loc[df_test['id'].isin(bs.selection.selected)]
+
+    # Training data
+    X_train = (
+        df_train.drop(['date', 'id', 'label', 'ret'], axis=1)
+        # df_train.drop(['date', 'id', 'label'], axis=1)  # Include ret in the features as a proof of concept
+    )
+    y_train = df_train['label'].loc[X_train.index]
+    grouped_train = df_train.groupby('date').size().to_numpy()
+    dtrain = xgb.DMatrix(X_train, label=y_train)
+    dtrain.set_group(grouped_train)
+
+    # Test data
+    y_test = pd.Series(df_test['label'].values, index=df_test['id'])
+    X_test = df_test.drop(['date', 'id', 'label', 'ret'], axis=1)
+    # X_test = df_test.drop(['date', 'id', 'label'], axis=1)  # Include ret in the features as a proof of concept
+    grouped_test = df_test.groupby('date').size().to_numpy()
+    dtest = xgb.DMatrix(X_test)
+    dtest.set_group(grouped_test)
+
+    # Train the model using the training data
+    if rebdate in training_dates:
+        model = xgb.train(params_xgb, dtrain, 100)
+        bs.model_ltr = model
+    else:
+        # Use the previous model for the current rebalancing date
+        model = bs.model_ltr
+
+    # Predict using the test data
+    pred = model.predict(dtest)
+    preds =  pd.Series(pred, df_test['id'], dtype='float64')
+    ranks = preds.rank(method='first', ascending=True).astype(int)
+
+    # Output
+    scores = pd.concat({
+        'scores': preds,
+        'ranks': (100 * ranks / len(ranks)).astype(int),  # Normalize the ranks to be between 0 and 100
+        'true': y_test,
+        'ret': pd.Series(df_test['ret'].values, index=df_test['id']),
+    }, axis=1)
+    bs.optimization_data['scores'] = scores
+    return None
+
+
+
 
 
 # --------------------------------------------------------------------------
