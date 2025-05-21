@@ -57,7 +57,7 @@ from backtesting.backtest_data import BacktestData
 # - swiss performance index, SPI (from csv file)
 # --------------------------------------------------------------------------
 
-path_to_data = 'C:/Users/User/OneDrive/Documents/QPMwP/Data/'  # <change this to your path to data>
+path_to_data = '/Users/sarah/qpmwp-course/data/' 
 
 # Load market and jkp data from parquet files
 market_data = pd.read_parquet(path = f'{path_to_data}market_data.parquet')
@@ -130,7 +130,7 @@ ret
 merged_df = ret.to_frame().join(features, how='inner').sort_index()
 merged_df
 
-# Generate the labels (ranks) for the merged data
+# Generate the labels (ranks) for the merged data #每天独立排名
 labels = merged_df.groupby('date')['ret'].rank(method='first', ascending=True).astype(int)
 labels = 100 * labels / merged_df.groupby('date').size() # Normalize the ranks to be between 0 and 100
 labels = labels.astype(int)  # Convert to integer type

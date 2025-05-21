@@ -61,7 +61,7 @@ class Objective():
     def __init__(self, **kwargs):
         self.coefficients = kwargs
 
-    @property
+    @property #ensures the input is always a dictoinary
     def coefficients(self) -> dict:
         return self._coefficients
 
@@ -88,12 +88,12 @@ class OptimizationParameter(dict):
     def __init__(self, **kwargs):
         super().__init__(
             solver_name = 'cvxopt',
-        )
+        ) #initializes with default solver = cvxopt
         self.update(kwargs)
 
 
 
-class Optimization(ABC):
+class Optimization(ABC): #setting objectives, solving problems, handling results
 
     '''
     Abstract base class for optimization problems.
@@ -131,7 +131,7 @@ class Optimization(ABC):
         if 'P' not in obj_coeff.keys() or 'q' not in obj_coeff.keys():
             raise ValueError("Objective must contain 'P' and 'q'.")
 
-        # Ensure that P and q are numpy arrays
+        # Ensure that P and q are numpy arrays (so that they could be used in qp solvers)
         obj_coeff['P'] = to_numpy(obj_coeff['P'])
         obj_coeff['q'] = to_numpy(obj_coeff['q'])
 
