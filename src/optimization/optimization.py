@@ -165,21 +165,21 @@ class Optimization(ABC):
             **solver_settings
         )
 
-        # Deal with turnover constraint or penalty (cannot have both)
-        turnover_penalty = self.params.get('turnover_penalty')
+        # # Deal with turnover constraint or penalty (cannot have both)
+        # turnover_penalty = self.params.get('turnover_penalty')
 
-        ## Turnover constraint
-        tocon = self.constraints.l1.get('turnover')
-        if tocon is not None and (turnover_penalty is None or turnover_penalty == 0):
-            x_init = np.array(list(tocon['x0'].values()))
-            self.model.linearize_turnover_constraint(x_init=x_init,
-                                                     to_budget=tocon['rhs'])
+        # ## Turnover constraint
+        # tocon = self.constraints.l1.get('turnover')
+        # if tocon is not None and (turnover_penalty is None or turnover_penalty == 0):
+        #     x_init = np.array(list(tocon['x0'].values()))
+        #     self.model.linearize_turnover_constraint(x_init=x_init,
+        #                                              to_budget=tocon['rhs'])
 
-        ## Turnover penalty
-        if turnover_penalty is not None and turnover_penalty > 0:
-            x_init = pd.Series(self.params.get('x_init')).to_numpy()
-            self.model.linearize_turnover_objective(x_init=x_init,
-                                                    turnover_penalty=turnover_penalty)
+        # ## Turnover penalty
+        # if turnover_penalty is not None and turnover_penalty > 0:
+        #     x_init = pd.Series(self.params.get('x_init')).to_numpy()
+        #     self.model.linearize_turnover_objective(x_init=x_init,
+        #                                             turnover_penalty=turnover_penalty)
 
         return None
 
