@@ -219,9 +219,11 @@ ls = LeastSquares(
 # the last 256 observations (weekdays) of the return series as well as the benchmark
 # return series for the same period
 y = data['bm_series']
-optimization_data = OptimizationData(return_series=return_series.tail(256),
-                                     bm_series=y,
-                                     align=True)
+optimization_data = OptimizationData(
+    return_series=return_series.tail(256),
+    bm_series=y,
+    align=True
+)
 
 # Set the objective and solve
 ls.set_objective(optimization_data=optimization_data)
