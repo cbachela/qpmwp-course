@@ -31,6 +31,7 @@ class BacktestData():
         ids: Optional[pd.Series] = None,
         end_date: Optional[str] = None,
         width: Optional[int] = None,
+        weekdays_only: bool = True,
         fillna_value: Optional[float] = None,
     ) -> pd.DataFrame:
 
@@ -49,21 +50,33 @@ class BacktestData():
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
             X = X[X.index <= end_date][ids].tail(width+1).pct_change(fill_method=None).iloc[1:]
-            if fillna_value is not None:
-                X.fillna(fillna_value, inplace=True)
-            return X
+
+        if weekdays_only:
+            # Drop weekends except for the last two days if they are weekends
+            mask = X.index.dayofweek < 5
+            mask[-2] = True
+            mask[-1] = True
+            X = X[mask]
+
+        if fillna_value is not None:
+            X.fillna(fillna_value, inplace=True)
+
+        return X
+
 
     def get_volume_series(
         self,
         ids: Optional[pd.Series] = None,
         end_date: Optional[str] = None,
         width: Optional[int] = None,
+        weekdays_only: bool = True,
+        fillna_value: Optional[float] = None,
     ) -> pd.DataFrame:
 
         X = self.market_data.pivot_table(
-            index = 'date',
-            columns = 'id',
-            values = 'liquidity',
+            index='date',
+            columns='id',
+            values='liquidity',
         )
         if ids is None:
             ids = X.columns
@@ -71,7 +84,19 @@ class BacktestData():
             end_date = X.index.max().strftime('%Y-%m-%d')
         if width is None:
             width = X.shape[0]
+
+        if weekdays_only:
+            # Drop weekends except for the last two days if they are weekends
+            mask = X.index.dayofweek < 5
+            mask[-2] = True
+            mask[-1] = True
+            X = X[mask]
+
+        if fillna_value is not None:
+            X.fillna(fillna_value, inplace=True)
+
         return X[X.index <= end_date][ids].tail(width)
+
 
     def get_characteristic_series(
         self,
@@ -82,9 +107,9 @@ class BacktestData():
     ) -> pd.DataFrame:
 
         X = self.jkp_data.pivot_table(
-            index = 'date',
-            columns = 'id',
-            values = field,
+            index='date',
+            columns='id',
+            values=field,
         )
         if ids is None:
             ids = X.columns

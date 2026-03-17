@@ -38,7 +38,7 @@ sys.path.append(src_path)
 from helper_functions import load_data_msci
 from optimization.constraints import Constraints
 from optimization.optimization import LeastSquares
-from backtesting.backtest_item_builder_classes import (
+from backtesting.backtest_item_builder.bib_classes import (
     OptimizationItemBuilder,
 )
 from backtesting.backtest_item_builder_functions import (
@@ -138,12 +138,12 @@ rebdates
 optimization_item_builders = {
     'return_series': OptimizationItemBuilder(
         bibfn=bibfn_return_series,
-        width=365 * 3,
+        width=256 * 3,
         name='return_series',
     ),
     'bm_series': OptimizationItemBuilder(
         bibfn=bibfn_bm_series,
-        width=365 * 3,
+        width=256 * 3,
         align=False,
         name='bm_series',
     ),
@@ -241,7 +241,7 @@ bs.data['bm_series_1.3x'] = bs.data['bm_series'] * 1.3
 # with a new one for the 1.3x levered benchmark series
 optimization_item_builders['bm_series'] = OptimizationItemBuilder(
     bibfn=bibfn_bm_series,
-    width=365 * 3,
+    width=256 * 3,
     align=False,
     name='bm_series_1.3x',
 )

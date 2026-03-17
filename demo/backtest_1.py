@@ -44,7 +44,7 @@ from optimization.constraints import Constraints
 from optimization.optimization import MeanVariance
 from backtesting.backtest import Backtest                  # NEW
 from backtesting.backtest_service import BacktestService   # NEW
-from backtesting.backtest_item_builder_classes import (
+from backtesting.backtest_item_builder.bib_classes import (
     OptimizationItemBuilder,                               # NEW
 )
 from backtesting.backtest_item_builder_functions import (
@@ -343,7 +343,40 @@ print(f'Max Drawdown: {max_drawdown}')
 
 
 
+optimization_item_builders = {
+    'return_series': OptimizationItemBuilder(
+        bibfn=bibfn_return_series,
+        width=256 * 1,
+    ),
+}
+bs = BacktestService(
+    data=data,
+    optimization=optimization,
+    optimization_item_builders=optimization_item_builders,
+    rebdates=rebdates,
+)
+bt_mv_1y = Backtest()
+bt_mv_1y.run(bs=bs)
 
+
+
+sim_mv_1y = bt_mv_1y.strategy.simulate(
+    return_series=return_series,
+    fc=fixed_costs,
+    vc=variable_costs,
+)
+
+sim = pd.concat({
+    'bm': bs.data['bm_series'],
+    'mv': sim_mv,
+    'mv_1y': sim_mv_1y,
+}, axis = 1).dropna()
+sim.columns = sim.columns.get_level_values(0)
+
+
+(1 + sim).cumprod().plot(title='Cumulative Performance', figsize= (10, 6))
+# np.log((1 + sim)).cumsum().plot(title='Cumulative Performance', figsize=(10, 6))
+# np.log((1 + sim).cumprod()).plot(title='Cumulative Performance', figsize=(10, 6))
 
 
 
