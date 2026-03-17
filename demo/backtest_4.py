@@ -82,9 +82,9 @@ from backtesting.backtest import Backtest
 # Constants
 # --------------------------------------------------------------------------
 
-PATH_TO_DATA = 'C:/Users/User/OneDrive/Documents/QPMwP/Data/'     # <change this to your path to data>
-SAVE_PATH = 'C:/Users/User/OneDrive/Documents/QPMwP/2026/Code/'   # <change this to your path where you want to store the backtest>
-WIDTH_3Y = 365 * 3 # Notice that we use 365 days bcs the dataset also contains weekends and holidays
+PATH_TO_DATA = '...'     # <change this to your path to data>
+SAVE_PATH = '...'        # <change this to your path where you want to store the backtest>
+WIDTH_3Y = 365 * 3       # Notice that we use 365 days bcs the dataset also contains weekends and holidays
 
 
 
