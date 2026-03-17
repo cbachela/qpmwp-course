@@ -304,7 +304,7 @@ bt_mv_to_cons.run(bs=bs)
 # In order to run a backtest with a turnover penalty, we needed to update the
 # source code at the following locations:
 
-# - src/backtesting/backtest_sercice.py:
+# - src/backtesting/backtest_service.py:
 #   Extend method build_optimization to calculate the initial weight vector x_init
 
 # - src/optimization/optimization.py:
