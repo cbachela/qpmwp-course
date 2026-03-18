@@ -27,7 +27,7 @@ from optimization.constraints import Constraints
 from backtesting.selection import Selection
 from backtesting.strategy import Strategy
 from backtesting.portfolio import floating_weights
-from backtesting.backtest_item_builder_classes import (
+from backtesting.backtest_item_builder.bib_classes import (
     SelectionItemBuilder,
     OptimizationItemBuilder,
 )

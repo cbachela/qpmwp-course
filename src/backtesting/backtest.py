@@ -96,6 +96,7 @@ class Backtest:
                 filename = os.path.join(path, filename)   #// alternatively, use pathlib package
             with open(filename, "wb") as f:
                 pickle.dump(self, f, protocol=pickle.HIGHEST_PROTOCOL)
+            print(f"Backtest object saved successfully to {filename}")
         except Exception as ex:
             print("Error during pickling object:", ex)
 

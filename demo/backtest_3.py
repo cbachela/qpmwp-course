@@ -47,7 +47,7 @@ from estimation.expected_return import ExpectedReturn
 from optimization.optimization import MeanVariance
 from backtesting.backtest import Backtest
 from backtesting.backtest_service import BacktestService
-from backtesting.backtest_item_builder_classes import (
+from backtesting.backtest_item_builder.bib_classes import (
     OptimizationItemBuilder,
     SelectionItemBuilder,                                   # NEW
 )
@@ -157,7 +157,7 @@ selection_item_builders = {
 optimization_item_builders = {
     'return_series': OptimizationItemBuilder(
         bibfn=bibfn_return_series,
-        width=365 * 3,
+        width=356 * 3,
         name='return_series',
     ),
     'budget_constraint': OptimizationItemBuilder(
@@ -167,7 +167,7 @@ optimization_item_builders = {
     'box_constraints': OptimizationItemBuilder(
         bibfn=bibfn_box_constraints,
         lower=0,
-        upper=1,
+        upper=0.5,
     ),
 }
 
