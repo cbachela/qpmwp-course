@@ -47,7 +47,7 @@ from backtesting.backtest_item_builder.bib_classes import (
 )
 from backtesting.backtest_item_builder.bibfn_selection import (
     bibfn_selection_gaps,
-    # bibfn_selection_min_volume,
+    bibfn_selection_min_volume,
     bibfn_selection_jkp_data_scores,                             # NEW
 )
 from backtesting.backtest_item_builder.bibfn_optimization_data import (
@@ -159,14 +159,14 @@ selection_item_builders = {
         width=WIDTH_3Y,
         n_days=10,
     ),
-    # 'min_volume': SelectionItemBuilder(
-    #     bibfn=bibfn_selection_min_volume,
-    #     width=WIDTH_3Y,
-    #     min_volume=500_000,
-    #     agg_fn=np.median,
-    # ),
+    'min_volume': SelectionItemBuilder(
+        bibfn=bibfn_selection_min_volume,
+        width=WIDTH_3Y,
+        min_volume=500_000,
+        agg_fn=np.median,
+    ),
     'jkp_data_scores': SelectionItemBuilder(                          # NEW
-        bibfn=bibfn_selection_jkp_data_scores,                   
+        bibfn=bibfn_selection_jkp_data_scores,    
         fields=['qmj'], #, 'qmj_prof', 'qmj_growth', 'qmj_safety'],   # See jkp_data.columns for available fields
     ),
 }
@@ -245,10 +245,7 @@ bt_sv.run(bs=bs)
 # )
 
 
-bs.selection.df()
-bs.selection.df_binary().sum()
 
-bs.optimization_data.keys()
 
 
 

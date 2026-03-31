@@ -140,6 +140,38 @@ def bibfn_selection_gaps(bs, rebdate: str, **kwargs) -> pd.Series:
 
 
 
+def bibfn_selection_min_volume(bs, rebdate: str, **kwargs) -> pd.DataFrame:
+
+    '''
+    Backtest item builder function for defining the selection
+    Filter stocks based on minimum volume (i.e., liquidity).
+    '''
+
+    # Arguments
+    width = kwargs.get('width', 365)
+    agg_fn = kwargs.get('agg_fn', np.median)
+    min_volume = kwargs.get('min_volume', 500_000)
+
+    # Volume data
+    vol = bs.data.get_volume_series(
+        end_date=rebdate,
+        width=width,
+        weekdays_only=True,
+        fillna_value=0,
+    )
+    vol_agg = vol.apply(agg_fn, axis=0)
+
+    # Filtering
+    vol_binary = pd.Series(1, index=vol.columns, dtype=int, name='binary')
+    vol_binary.loc[vol_agg < min_volume] = 0
+
+    # Output
+    filter_values = pd.DataFrame({
+        'values': vol_agg,
+        'binary': vol_binary,
+    }, index=vol_agg.index)
+
+    return filter_values
 
 
 

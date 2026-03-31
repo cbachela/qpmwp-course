@@ -55,7 +55,7 @@ from backtesting.backtest_item_builder.bib_classes import (
 )
 from backtesting.backtest_item_builder.bibfn_selection import (
     bibfn_selection_gaps,                                          # NEW
-    # bibfn_selection_min_volume,                                    # NEW
+    bibfn_selection_min_volume,                                    # NEW
 )
 from backtesting.backtest_item_builder.bibfn_optimization_data import (
     bibfn_return_series,
@@ -529,17 +529,17 @@ sim = pd.concat({
     'bm': bs.data.bm_series,
     'mv': sim_mv,
     'mv_v1': sim_mv_v1,
-    # 'mv_v2': sim_mv_v2,
-    # 'mv_v3': sim_mv_v3,
-    # 'mv_v4': sim_mv_v4,
+    'mv_v2': sim_mv_v2,
+    'mv_v3': sim_mv_v3,
+    'mv_v4': sim_mv_v4,
 }, axis = 1).dropna()
 sim.columns = [
     'Benchmark',
     'Mean-Variance',
     'Mean-Variance, RA5',
-    # 'Mean-Variance, RA5, Gaps',
-    # 'Mean-Variance, RA5, Gaps, Liq',
-    # 'Mean-Variance, RA5, Gaps, Liq, SDUB'
+    'Mean-Variance, RA5, Gaps',
+    'Mean-Variance, RA5, Gaps, Liq',
+    'Mean-Variance, RA5, Gaps, Liq, SDUB'
 ]
 
 # Plot the cumulative performance
