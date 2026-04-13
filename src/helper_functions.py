@@ -4,7 +4,7 @@
 
 # --------------------------------------------------------------------------
 # Cyril Bachelard
-# This version:     16.02.2026
+# This version:     13.04.2026
 # First version:    18.01.2025
 # --------------------------------------------------------------------------
 
@@ -70,6 +70,82 @@ def load_data_spi(path: Optional[str] = None) -> pd.Series:
 
 
 
+def load_jkp_factor_series(path: Optional[str] = None) -> dict[str, pd.DataFrame]:
+
+    '''
+    Loads daily total return series from 1999-01-01 to 2023-04-18
+    for MSCI country indices and for the MSCI World index.
+    '''
+
+    path = os.path.join(os.getcwd(), f'data{os.sep}') if path is None else path
+
+    # Load msci country index return series
+    
+    df = pd.read_csv(
+        os.path.join(path, 'jkp_factor_series_che_eqw.csv'),
+        index_col=0,
+        header=0,
+        parse_dates=True,
+        date_format='%d/%m/%Y'
+    )
+
+    # Convert the date column to datetime and set it as a column (not index)
+    df['date'] = pd.to_datetime(df['date'], format='%d/%m/%Y')
+
+    # Create a multi-index with date and id (id = factor name)
+    df = df.set_index('date', append=True).swaplevel()
+    df.index.names = ['date', 'id']
+
+    factor_series = df['ret'].unstack(level='id').dropna()
+
+    return factor_series
+
+
+
+def align_market_data_with_jkp_data(
+    market_data: pd.DataFrame,
+    jkp_data: pd.DataFrame
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """
+    Aligns market data with JKP data by forward filling missing market data for dates present in JKP data.
+
+    Parameters:
+    - market_data: DataFrame containing market data with a Multiindex (date: DateTime, id: str).
+    - jkp_data: DataFrame containing JKP data with a Multiindex (date: DateTime, id: str).
+    
+    Returns:
+    - A tuple of DataFrames: (market_data_ffill, jkp_data) with market data aligned to 
+      the dates in JKP data, with missing values forward filled.
+    """
+
+    # Drop rows with missing 'id' values
+    market_data_clean = market_data[~market_data.index.get_level_values('id').isna()]
+    jkp_data_clean = jkp_data[~jkp_data.index.get_level_values('id').isna()]
+
+    market_data_dates = (
+        market_data_clean
+        .index.get_level_values('date')
+        .unique().sort_values()
+    )
+    jkp_data_dates = (
+        jkp_data_clean
+        .index.get_level_values('date')
+        .unique().sort_values()
+    )
+    missing_dates = jkp_data_dates[~jkp_data_dates.isin(market_data_dates)]
+    tmp_dict = {}
+    for date in missing_dates:
+        last_date = market_data_dates[market_data_dates <= date][-1]
+        tmp_dict[date] = market_data_clean.loc[last_date]
+
+    df_missing = pd.concat(tmp_dict, axis=0)
+    df_missing.index.names = market_data_clean.index.names
+    market_data_ffill = pd.concat([market_data_clean, df_missing]).sort_index()
+
+    return market_data_ffill, jkp_data_clean
+
+
+
 def load_pickle(filename: str,
                 path: Optional[str] = None) -> Union[Any, None]:
     if path is not None:
@@ -90,6 +166,7 @@ def to_numpy(data: Optional[Union[np.ndarray, pd.DataFrame, pd.Series]]) -> Opti
     return None if data is None else (
         data.to_numpy() if hasattr(data, 'to_numpy') else data
     )
+
 
 
 def simulate_correlated_gbm(mu, sigma, T=252, S0=None, random_seed=None) -> pd.DataFrame:
