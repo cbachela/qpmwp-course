@@ -4,13 +4,14 @@
 
 # --------------------------------------------------------------------------
 # Cyril Bachelard
-# This version:     16.02.2026
+# This version:     14.04.2026
 # First version:    18.01.2025
 # --------------------------------------------------------------------------
 
 
 
 # Standard library imports
+import operator
 from abc import ABC, abstractmethod
 from typing import Optional
 
@@ -308,6 +309,69 @@ class MinVariance(Optimization):
             )
         else:
             return super().solve()
+
+
+
+class PercentilePortfolio(Optimization):
+
+    def __init__(self,
+                 field: Optional[str] = None,
+                 score_weights: Optional[dict] = None,
+                 percentile: int = 80,     # has to be between 0 and 100
+                 sign: str = '>=',         # can be one of '>=', '<=', '>', '<'
+):
+        super().__init__(
+            field=field,
+            score_weights=score_weights,
+            percentile=percentile,
+            sign=sign,
+            solver_name='no-solver-used',
+        )
+
+    def set_objective(self, optimization_data: OptimizationData) -> None:
+
+        field = self.params.get('field')
+        if field is not None:
+            scores = optimization_data['scores'][field]
+        else:
+            score_weights = self.params.get('score_weights')
+            if score_weights is not None:
+                # Compute weighted average
+                scores = (
+                    optimization_data['scores'][score_weights.keys()]
+                    .multiply(score_weights.values())
+                    .sum(axis=1)
+                )
+            else:
+                scores = optimization_data['scores'].mean(axis=1).squeeze()
+
+        # Add tiny noise to zeros since otherwise there might be two threshold values == 0
+        scores[scores == 0] = np.random.normal(0, 1e-10, scores[scores == 0].shape)
+        self.objective = Objective(scores=scores)
+
+        return None
+
+    def solve(self) -> None:
+
+        scores = self.objective.coefficients['scores']
+        th = np.percentile(scores, self.params.get('percentile'))
+        sign = self.params.get('sign')
+
+        ops = {
+            '>=': operator.ge,
+            '<=': operator.le,
+            '>': operator.gt,
+            '<': operator.lt,
+        }
+        weights = scores.where(ops[sign](scores, th)).dropna()
+        weights = weights * 0 + 1/len(weights)    # Set all non-zero weights to 1/n (we could also think of weighting proportional to market capitalization)
+
+        self.results.update({
+            'weights': weights.to_dict(),
+            'status': True,
+        })
+
+        return None
 
 
 
