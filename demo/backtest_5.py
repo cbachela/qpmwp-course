@@ -50,7 +50,7 @@ from backtesting.backtest_item_builder.bib_classes import (
 )
 from backtesting.backtest_item_builder.bibfn_selection import (
     bibfn_selection_gaps,
-    # bibfn_selection_min_volume,
+    bibfn_selection_min_volume,
 )
 from backtesting.backtest_item_builder.bibfn_optimization_data import (
     bibfn_return_series,
@@ -163,12 +163,12 @@ selection_item_builders = {
         width=WIDTH_3Y,
         n_days=10,
     ),
-    # 'min_volume': SelectionItemBuilder(
-    #     bibfn=bibfn_selection_min_volume,
-    #     width=WIDTH_3Y,
-    #     min_volume=500_000,
-    #     agg_fn=np.median,
-    # ),
+    'min_volume': SelectionItemBuilder(
+        bibfn=bibfn_selection_min_volume,
+        width=WIDTH_3Y,
+        min_volume=500_000,
+        agg_fn=np.median,
+    ),
 }
 
 
@@ -301,8 +301,7 @@ bt_mv_to_cons.run(bs=bs)
 # Run backtest: Mean-Variance with turnover penalty in the objective function
 # --------------------------------------------------------------------------
 
-# In order to run a backtest with a turnover penalty, we needed to update the
-# source code at the following locations:
+# In order to run a backtest with a turnover penalty, the source code was updated in the following files:
 
 # - src/backtesting/backtest_service.py:
 #   Extend method build_optimization to calculate the initial weight vector x_init
