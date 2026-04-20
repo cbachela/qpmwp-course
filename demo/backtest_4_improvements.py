@@ -354,17 +354,20 @@ def bibfn_selection_min_volume(bs, rebdate: str, **kwargs) -> pd.DataFrame:
 
     # Arguments
     width = kwargs.get('width', 365)
-    agg_fn = # <your code here>
-    min_volume = # <your code here>
+    agg_fn = kwargs.get('agg_fn', np.median)
+    min_volume = kwargs.get('min_volume', 500_000)
 
     # Volume data
     vol = bs.data.get_volume_series(
-        # <your code here>
+        end_date=rebdate,
+        width=width,
+        fillna_value=0,
+        weekdays_only=True,
     )
-    vol_agg = # <your code here>
+    vol_agg = agg_fn(vol, axis=0)
 
     # Filtering
-    # <your code here>
+    filter_values = vol_agg >= min_volume
 
     # Output
     # <your code here>

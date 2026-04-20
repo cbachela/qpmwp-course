@@ -82,8 +82,8 @@ from backtesting.backtest import Backtest
 # Constants
 # --------------------------------------------------------------------------
 
-PATH_TO_DATA = '...'     # <change this to your path to data>
-SAVE_PATH = '...'        # <change this to your path where you want to store the backtest>
+PATH_TO_DATA = '/Users/michaelebling/Documents/UZH/Sem_8/Quant._Portfolio_Mngmt_Python/Data/'     # <change this to your path to data>
+SAVE_PATH = '/Users/michaelebling/Documents/UZH/Sem_8/Quant._Portfolio_Mngmt_Python/Data/'        # <change this to your path where you want to store the backtest>
 WIDTH_3Y = 365 * 3       # Notice that we use 365 days bcs the dataset also contains weekends and holidays
 
 
@@ -315,11 +315,11 @@ bt_mv = Backtest()
 # Run the backtest
 bt_mv.run(bs=bs)
 
-# # Save the backtest as a .pickle file
-# bt_mv.save(
-#     path=SAVE_PATH,
-#     filename='demo_backtest_4_mv.pickle' # <change this to your desired filename>
-# )
+# Save the backtest as a .pickle file
+bt_mv.save(
+     path=SAVE_PATH,
+     filename='demo_backtest_4_mv.pickle' # <change this to your desired filename>
+)
 
 
 # Manually check how many companies are affected by the NA filter
@@ -450,11 +450,11 @@ bt_ls = Backtest()
 # Run the backtest
 bt_ls.run(bs=bs)
 
-# # Save the backtest as a .pickle file
-# bt_ls.save(
-#     path=SAVE_PATH,
-#     filename='demo_backtest_4_ls.pickle' # <change this to your desired filename>
-# )
+# Save the backtest as a .pickle file
+bt_ls.save(
+    path=SAVE_PATH,
+    filename='demo_backtest_4_ls.pickle' # <change this to your desired filename>
+)
 
 
 
