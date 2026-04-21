@@ -102,6 +102,27 @@ def bibfn_bm_series(bs: 'BacktestService', rebdate: str, **kwargs) -> None:
 
 
 
+def bibfn_cap_weights(bs: 'BacktestService', rebdate: str, **kwargs) -> None:
+
+    # Selection
+    ids = bs.selection.selected
+
+    # Data - market capitalization
+    mcap = bs.data.market_data['mktcap']
+
+    # Get last available values for current rebdate
+    mcap = mcap[mcap.index.get_level_values('date') <= rebdate].groupby(
+        level = 'id'
+    ).last()
+
+    # Remove duplicates
+    mcap = mcap[~mcap.index.duplicated(keep=False)].loc[ids]
+
+    # Attach cap-weights to the optimization data object
+    bs.optimization_data['cap_weights'] = mcap / mcap.sum()
+
+    return None
+
 
 
 def bibfn_scores(bs: 'BacktestService', rebdate: str, **kwargs) -> None:
