@@ -192,8 +192,7 @@ class Strategy:
             to = self.turnover(return_series=return_series,
                                rescale=False)
             varcost = to * vc
-            portf_ret[0] -= varcost[0]
-            portf_ret[varcost[1:].index] -= varcost[1:].values
+            portf_ret.loc[varcost.index] -= varcost.values
 
         if fc != 0:
             # Calculate number of days between returns
