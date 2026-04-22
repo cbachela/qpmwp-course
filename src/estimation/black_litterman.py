@@ -120,6 +120,7 @@ def view_from_scores_quintile_sort(
     q : pd.Series
         The expected returns for the views, scaled by scalefactor.
     """
+    
     # Input validation
     if len(scores) == 0 or len(mu_ref) == 0:
         raise ValueError("Input series cannot be empty")
@@ -131,6 +132,9 @@ def view_from_scores_quintile_sort(
 
     scores_aligned = scores[common_index]
     mu_ref_aligned = mu_ref[common_index]
+    
+    # Take the negative of scores so that first quintile corresponds to highest scores (best assets)
+    scores_aligned = -scores_aligned
 
     # Define quintile parameters
     n_quintiles = 5
@@ -142,7 +146,7 @@ def view_from_scores_quintile_sort(
 
     for q_idx in range(1, len(score_thresholds)):
         quintile_name = f'Q{q_idx}'
-        
+
         # Determine assets in current quintile
         if q_idx == 1:
             # First quintile: scores <= threshold
@@ -191,7 +195,7 @@ def view_from_scores_quintile_sort(
 def view_from_scores_longshort_sort(
     scores: pd.Series,
     mu_ref: pd.Series,
-    scalefactor: int = 1,
+    scalefactor: float = 1,
 ) -> (pd.DataFrame, pd.Series):
     """
     Generate view on a long-short portfolio based on quintile thresholds of scores.
@@ -202,8 +206,8 @@ def view_from_scores_longshort_sort(
         The scores used to determine long and short positions.
     mu_ref : pd.Series
         The reference mean vector.
-    scalefactor : int, optional
-        A scaling factor for the expected returns (default is 252).
+    scalefactor : float, optional
+        A scaling factor for the expected returns (default is 1).
 
     Returns:
     --------
@@ -242,7 +246,7 @@ def view_from_scores_longshort_sort(
 def view_from_scores_complete_sort(
     scores: pd.Series,
     mu_ref: pd.Series,
-    scalefactor: int = 1,
+    scalefactor: float = 1,
 ) -> (pd.DataFrame, pd.Series):
     """
     Generate views based on full ranking of scores.
@@ -253,8 +257,8 @@ def view_from_scores_complete_sort(
         The scores used to determine the ranking.
     mu_ref: pd.Series
         The reference mean vector.
-    scalefactor: int, optional
-        A scaling factor for the expected returns (default is 252).
+    scalefactor: float, optional
+        A scaling factor for the expected returns (default is 1).
 
     Returns:
     --------
@@ -272,7 +276,7 @@ def view_from_scores_complete_sort(
         np.zeros((len(scores_clean), len(scores))),
         index=scores_clean.index,
         columns=scores.index
-    )    
+    )
     # Set values to 1 for the scores that are not NaN
     for idx in scores_clean.index:
         P.loc[idx, idx] = 1
@@ -311,7 +315,7 @@ def generate_views_from_scores(
     scores: pd.Series,
     mu_ref: pd.Series,
     method: str = 'quintile_sort',
-    scalefactor: int = 1,
+    scalefactor: float = 1,
 ) -> (pd.DataFrame, pd.Series):
     """
     Generate views based on scores using the specified method.
@@ -325,7 +329,7 @@ def generate_views_from_scores(
     method: str, optional
         The method to generate views ('quintile_sort' or 'complete_sort').
         Default is 'quintile'.
-    scalefactor: int, optional
+    scalefactor: float, optional
         A scaling factor for the expected returns (default is 1).
 
     Returns:
