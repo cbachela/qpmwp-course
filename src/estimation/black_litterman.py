@@ -120,7 +120,7 @@ def view_from_scores_quintile_sort(
     q : pd.Series
         The expected returns for the views, scaled by scalefactor.
     """
-    
+
     # Input validation
     if len(scores) == 0 or len(mu_ref) == 0:
         raise ValueError("Input series cannot be empty")
@@ -132,7 +132,7 @@ def view_from_scores_quintile_sort(
 
     scores_aligned = scores[common_index]
     mu_ref_aligned = mu_ref[common_index]
-    
+
     # Take the negative of scores so that first quintile corresponds to highest scores (best assets)
     scores_aligned = -scores_aligned
 
