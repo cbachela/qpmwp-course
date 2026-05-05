@@ -29,7 +29,7 @@ import numpy as np
 import pandas as pd
 
 # Add the project root directory to Python path
-project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+project_root = os.path.dirname(os.path.dirname(os.getcwd()))
 src_path = os.path.join(project_root, 'src')
 sys.path.append(project_root)
 sys.path.append(src_path)
@@ -38,11 +38,13 @@ sys.path.append(src_path)
 from helper_functions import (
     load_pickle,
     load_data_spi,
-    load_jkp_factor_series,
     align_market_data_with_jkp_data,
 )
 from estimation.covariance import Covariance
-from optimization.optimization import ScoreVariance
+from optimization.optimization import (
+    ScoreVariance,
+    PercentilePortfolio,
+)
 from backtesting.backtest_item_builder.bib_classes import (
     SelectionItemBuilder,
     OptimizationItemBuilder,
@@ -72,11 +74,9 @@ from backtesting.backtest import Backtest
 # Constants
 # --------------------------------------------------------------------------
 
-PATH_TO_DATA = '...'     # <change this to your path to data>
-SAVE_PATH = '...'        # <change this to your path where you want to store the backtest>
+PATH_TO_DATA = 'C:/Users/User/OneDrive/Documents/QPMwP/Data/'     # <change this to your path to data>
+SAVE_PATH = 'C:/Users/User/OneDrive/Documents/QPMwP/2026/Code/'   # <change this to your path where you want to store the backtest>
 WIDTH_3Y = 365 * 3
-
-
 
 
 
@@ -92,11 +92,11 @@ WIDTH_3Y = 365 * 3
 # Load market and jkp data from parquet files
 market_data = pd.read_parquet(path = f'{PATH_TO_DATA}market_data.parquet')
 jkp_data = pd.read_parquet(path = f'{PATH_TO_DATA}jkp_data.parquet')
-spi = load_data_spi(path='../data/')
+spi = load_data_spi(path=f'{project_root}/data/')
 
 # Load ML signal and add to jkp_data (so that we can use it in the backtest)
-ml_signal = pd.read_parquet(path=f'{PATH_TO_DATA}ml_signal.parquet')
-ml_signal = ml_signal.stack().squeeze()
+ml_signal = pd.read_parquet(path=f'{PATH_TO_DATA}ltr_signal.parquet')
+ml_signal = ml_signal.stack().squeeze().astype("float64")
 ml_signal.name = 'ml_signal'
 ml_signal.index.names = jkp_data.index.names
 
@@ -140,7 +140,7 @@ rebdates = (
     .strftime('%Y-%m-%d').tolist()
 )
 rebdates = [
-    date for date in rebdates if date > '2002-01-01'
+    date for date in rebdates if date >= '2003-01-31'
     and date < rebdates[-1]
 ]
 rebdates
@@ -227,7 +227,7 @@ field_name = 'ml_signal'  # <change this to your desired field name from jkp_dat
 bs.optimization = ScoreVariance(
     field=field_name,
     covariance=Covariance(method='pearson'),
-    risk_aversion=1,
+    risk_aversion=10000,
     solver_name='cvxopt',
 )
 
@@ -240,10 +240,58 @@ bt_sv.run(bs=bs)
 # # Save the backtest as a .pickle file
 # bt_sv.save(
 #     path=SAVE_PATH,
-#     filename=f'demo_backtest_xxx_sv_{field_name}.pickle' # <change this to your desired filename>
+#     filename=f'demo_backtest_7_sv_{field_name}.pickle' # <change this to your desired filename>
 # )
 
 
+
+# --------------------------------------------------------------------------
+# Run backtest for a top quintile portfolio (tqp)
+# --------------------------------------------------------------------------
+
+# Update the backtest service with a PercentilePortfolio optimization object
+bs.optimization = PercentilePortfolio(
+    field='ml_signal',  # <change this to your desired field name from jkp_data>
+    percentile=80,
+    sign='>=',
+)
+
+# Instantiate the backtest object and run the backtest
+bt_tqp = Backtest()
+
+# Run the backtest
+bt_tqp.run(bs=bs)
+
+# # Save the backtest as a .pickle file
+# bt_tqp.save(
+#     path=SAVE_PATH,
+#     filename=f'demo_backtest_7_tqp_{field_name}.pickle' # <change this to your desired filename>
+# )
+
+
+
+# --------------------------------------------------------------------------
+# Run backtest for a bottom quintile portfolio (bqp)
+# --------------------------------------------------------------------------
+
+# Update the backtest service with a PercentilePortfolio optimization object
+bs.optimization = PercentilePortfolio(
+    field='ml_signal',  # <change this to your desired field name from jkp_data>
+    percentile=20,
+    sign='<=',
+)
+
+# Instantiate the backtest object and run the backtest
+bt_bqp = Backtest()
+
+# Run the backtest
+bt_bqp.run(bs=bs)
+
+# # Save the backtest as a .pickle file
+# bt_bqp.save(
+#     path=SAVE_PATH,
+#     filename=f'demo_backtest_7_bqp_{field_name}.pickle' # <change this to your desired filename>
+# )
 
 
 
@@ -251,30 +299,63 @@ bt_sv.run(bs=bs)
 # Simulate strategies
 # --------------------------------------------------------------------------
 
-# Laod backtests from pickle
+# Load backtests from pickle
 bt_sv = load_pickle(
-    filename=f'demo_backtest_4_sv_{field_name}.pickle',
+    filename=f'demo_backtest_7_sv_{field_name}.pickle',
+    path=SAVE_PATH,
+)
+bt_tqp = load_pickle(
+    filename=f'demo_backtest_7_tqp_{field_name}.pickle',
+    path=SAVE_PATH,
+)
+bt_bqp = load_pickle(
+    filename=f'demo_backtest_7_bqp_{field_name}.pickle',
     path=SAVE_PATH,
 )
 
 # Simulate
 fixed_costs = 0
-variable_costs = 0
-return_series = bs.data.get_return_series()
+variable_costs = 0.002
+return_series = bs.data.get_return_series(weekdays_only=False)
 
-sim_sv = bt_sv.strategy.simulate(
+sim_sv_gross = bt_sv.strategy.simulate(
     return_series=return_series,
     fc=fixed_costs,
-    vc=variable_costs
+    vc=0,
 )
+sim_sv_net = bt_sv.strategy.simulate(
+    return_series=return_series,
+    fc=fixed_costs,
+    vc=variable_costs,
+)
+# sim_tqp = bt_tqp.strategy.simulate(
+#     return_series=return_series,
+#     fc=fixed_costs,
+#     vc=variable_costs
+# )
+# sim_bqp = bt_bqp.strategy.simulate(
+#     return_series=return_series,
+#     fc=fixed_costs,
+#     vc=variable_costs
+# )
 
 # Concatenate the simulations
 sim = pd.concat({
     'bm': bs.data.bm_series,
-    f'sv_{field_name}': sim_sv,
+    f'sv_gross_{field_name}': sim_sv_gross,
+    f'sv_net_{field_name}': sim_sv_net,
+    # f'tqp_{field_name}': sim_tqp,
+    # f'bqp_{field_name}': sim_bqp,
 }, axis=1).dropna()
-sim.columns = ['Benchmark', f'Score Variance ({field_name})']
+sim.columns = [
+    'Benchmark',
+    f'Score Variance Gross ({field_name})',
+    f'Score Variance Net ({field_name})',
+    # f'Top Quintile ({field_name})',
+    # f'Bottom Quintile ({field_name})'
+]
 
+sim = sim[sim.index <= '2022-12-31']
 
 # Plot the cumulative performance
 np.log((1 + sim)).cumsum().plot(title='Cumulative Performance', figsize=(10, 6))
@@ -299,18 +380,7 @@ np.log((1 + sim_rel)).cumsum().plot(title='Cumulative Out-/Underperformance', fi
 # Turnover
 # --------------------------------------------------------------------------
 
-to_mv = bt_mv.strategy.turnover(return_series=return_series)
-to_sv = bt_sv.strategy.turnover(return_series=return_series)
-
-to = pd.concat({
-    'mv': to_mv,
-    'sv': to_sv,
-}, axis = 1).dropna()
-to.columns = [
-    'Mean-Variance',
-    f'Score Variance ({field_name})',
-]
-
+to = bt_sv.strategy.turnover(return_series=return_series)
 to.plot(title='Turnover', figsize = (10, 6))
 to.mean() * 4
 

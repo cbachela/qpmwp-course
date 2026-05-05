@@ -185,15 +185,10 @@ def bibfn_selection_jkp_data_scores(bs, rebdate: str, **kwargs) -> pd.DataFrame:
     # Arguments
     fields = kwargs.get('fields')
 
-    # Selection
-    ids = bs.selection.selected
-    if ids is None:
-        ids = bs.data.jkp_data.index.get_level_values('id').unique()
-
     # Filter rows prior to the rebdate and within one year
     df = bs.data.jkp_data[fields]
     filtered_df = df.loc[
-        (df.index.get_level_values('date') < rebdate) &
+        (df.index.get_level_values('date') <= rebdate) &
         (df.index.get_level_values('date') >= pd.to_datetime(rebdate) - pd.Timedelta(days=365))
     ]
 
