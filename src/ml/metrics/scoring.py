@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 from scipy.stats import spearmanr
+from sklearn.metrics import ndcg_score
 
 
 def cross_sectional_ic(y_true, y_pred):
@@ -53,3 +54,31 @@ def mae_per_date(y_true, y_pred):
     def mae_score(y_true, y_pred):
         return np.mean(np.abs(y_true - y_pred))
     return _cross_sectional_metric(y_true, y_pred, mae_score)
+
+
+def ndcg_scorer(y_true, y_pred, k=None):
+    """
+    Per date NDCG - averaged across all dates.
+ 
+    Used in make_scorer(ndcg_scorer) in
+    GridSearchCV.
+    """
+    
+    # Assert that y_true are all positive values
+    if not np.all((y_true >= 0) & (y_true.astype(int) == y_true)):
+        raise ValueError(
+            "y_true must be non-negative values."
+            "relevance grades represent gain which cannot be negative"
+        )
+
+    y_pred_s = pd.Series(y_pred, index=y_true.index)
+ 
+    scores = []
+    for date, group in y_true.groupby(level=0):
+        yt = group.to_numpy()
+        yp = y_pred_s.loc[date].to_numpy()
+        if len(yt) > 1:
+            score = ndcg_score(yt.reshape(1, -1), yp.reshape(1, -1), k=k)
+            scores.append(score)
+ 
+    return np.mean(scores) if scores else 0.0

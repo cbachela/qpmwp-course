@@ -431,6 +431,13 @@ class ObservationGridRollingSplit(BaseCrossValidator):
             n += 1
         return n
 
+    def get_split_at(self, X, t):
+        for i, (train_idx, test_idx) in enumerate(self.split(X=X)):
+            if i == t:
+                return train_idx, test_idx
+        raise IndexError(f"split_index {t} out of range (only {i} splits available)")
+
+
 
 class PanelTimeSeriesSplit(BaseCrossValidator):
     def __init__(self, n_splits=3, date_level="DATE"):
